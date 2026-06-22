@@ -21,6 +21,23 @@ Use this reference to avoid rebuilding existing tools.
 - Use `rembg` or an existing transparent visual asset skill for post-generation background removal.
 - Use the packager only for validation. It does not remove backgrounds.
 
+## Key Color Selection
+
+Do not default blindly to `#ff00ff`. A key color is only safe when it is absent from the UI art, reference palette, glows, shadows, and antialiasing.
+
+Use this order:
+
+1. Native alpha or LayerDiffuse.
+2. A key color selected by `scripts/suggest_key_color.py`.
+3. A custom key color chosen after visually inspecting the reference.
+4. Background removal/matting tools when no flat key is safe.
+
+```bash
+python <skill-root>/scripts/suggest_key_color.py --input <reference-image-or-folder>
+```
+
+When the script warns that all candidates are close to visible colors, do not force the best candidate. Regenerate with native alpha, choose a custom color far outside the palette, or segment with `rembg`, BiRefNet, PyMatting, or Segment Anything.
+
 ## Chroma-Key Edge Cleanup
 
 Use this when generated UI assets have a flat removable background such as `#ff00ff`, but visible pink/green/blue dust remains around the component edge.
@@ -32,7 +49,7 @@ Use this when generated UI assets have a flat removable background such as `#ff0
 python <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py \
   --input <raw-atlas-or-png> \
   --out <clean-alpha.png> \
-  --key-color "#ff00ff" \
+  --key-color "<selected-key-color>" \
   --soft-matte \
   --transparent-threshold 24 \
   --opaque-threshold 170 \

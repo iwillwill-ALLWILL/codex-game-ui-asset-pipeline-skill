@@ -646,7 +646,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input", required=True, type=Path, help="Folder containing generated PNG UI assets.")
     parser.add_argument("--output", required=True, type=Path, help="Output folder for packaged assets.")
     parser.add_argument("--pack-name", default="generated-ui", help="Slug used for manifests and engine folders.")
-    parser.add_argument("--engines", default="generic", help="Comma list: godot,unity,cocos,generic or all.")
+    parser.add_argument("--engines", default="godot", help="Comma list: godot,unity,cocos,generic or all. Defaults to godot.")
     parser.add_argument("--project", type=Path, help="Optional game project root to receive generated files.")
     parser.add_argument(
         "--godot-res-prefix",

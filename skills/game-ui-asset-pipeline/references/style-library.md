@@ -6,7 +6,7 @@ Use this reference when the user asks to upload UI references, store a long-term
 
 - Generate UI component art from prompts or reference images with `image_gen`, ComfyUI, or the project's configured image backend.
 - Extract reusable pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them.
-- Package existing PNGs into `assets/ui`, `preview.png`, `ui-asset-manifest.json`, Godot `.tscn`, Unity import helper, and Cocos prefab spec.
+- Package existing PNGs into `assets/ui`, `preview.png`, `ui-asset-manifest.json`, and Godot `.tscn` by default. Unity/Cocos outputs are opt-in.
 - Detect common chroma-key residue such as pink/green/blue edge dust during packaging.
 - Store user-provided style references in `assets/style-library/<style>/`, extract a dominant palette, and create a style card for future prompt construction.
 
@@ -50,13 +50,14 @@ Use this when the user wants the UI elements already present in a screenshot/ref
 
 1. Inspect the source image and list target components: panels, buttons, progress bars, icons, map nodes, slots, frames, tabs.
 2. If the user requested long-term reuse, ingest the source image into a style entry before extraction.
-3. Crop or segment components from the source. Use existing tools first:
+3. Decide component granularity before cutting. Default to L1 composite + L2 primitive outputs; add internal layers only when the user needs layered editing or runtime replacement.
+4. Crop or segment components from the source. Use existing tools first:
    - flat key/background: use the installed `imagegen` chroma-key cleanup helper
    - complex background: use `rembg`, BiRefNet, Segment Anything, or a local editor workflow if available
    - atlas/grid: remove divider pixels before slicing and add transparent padding after trim
-4. Remove baked text unless the user asks for literal text art; provide blank frames/buttons for engine text nodes.
-5. Package the resulting PNGs with `package_ui_assets.py`.
-6. Treat manifest warnings, visible residue, and clipped edges as blockers before delivery.
+5. Remove baked text unless the user asks for literal text art; provide blank frames/buttons for engine text nodes.
+6. Package the resulting PNGs with `package_ui_assets.py`, defaulting to Godot output only.
+7. Treat manifest warnings, visible residue, and clipped edges as blockers before delivery.
 
 ## Mode B: Generate Style-Locked UI From Stored References
 
@@ -68,10 +69,11 @@ Use this when the user wants new components in the same style as materials previ
    - material and linework notes from `style-card.md`
    - component shape rules from the reference image
    - explicit negative prompt for text, mockup screens, perspective scenes, and off-palette colors
-3. Generate all related components in one batch/atlas when possible so palette, stroke, lighting, and ornament density match.
-4. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
-5. Clean alpha, split components, pad edges, then package.
-6. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
+3. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
+4. Generate all related components in one batch/atlas when possible so palette, stroke, lighting, and ornament density match.
+5. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
+6. Clean alpha, split components according to the agreed granularity, pad edges, then package.
+7. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
 
 ## Prompt Pattern
 
@@ -82,6 +84,6 @@ Create isolated reusable game UI components, not a full screen mockup.
 Style source: <style title>. Match palette exactly: <hex colors>.
 Visual rules: <linework/material/corner/icon rules from style-card>.
 Components: <component list with states/parts>.
-Output: transparent PNG or flat #ff00ff removable background, orthographic UI art, no baked text, no watermark.
-Negative: modern flat app UI, photorealism, perspective scene, random colors outside palette, fuzzy edges, cropped glow.
+Output: transparent PNG or flat <selected-key-color> removable background, orthographic UI art, no baked text, no watermark.
+Negative: modern flat app UI, photorealism, perspective scene, random colors outside palette, fuzzy edges, cropped glow, key-color edge residue.
 ```

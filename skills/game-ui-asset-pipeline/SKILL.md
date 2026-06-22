@@ -12,15 +12,16 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 - Direct generation from prompt or current reference image.
 - Direct extraction from a user-uploaded UI screenshot or atlas into reusable components.
 - Style-locked generation from references stored under `assets/style-library`.
-- Packaging existing PNG components into manifest, preview, Godot, Unity, and Cocos scaffolding.
+- Packaging existing PNG components into a clean manifest, preview, and Godot scaffolding by default. Generate Unity/Cocos outputs only when requested.
 - Optional installation into a local Godot/Unity/Cocos project.
 
 ## Workflow
 
 1. Identify the target.
    - Components: `panel`, `button`, `progress_bar`, `icon`, `frame`, `slot`, `hud`.
-   - Engine: `godot`, `unity`, `cocos`, or `generic`.
+   - Engine: default to `godot` unless the user names `unity`, `cocos`, or `generic`.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
+   - Component granularity: choose `composite`, `primitive`, `layered`, or `content` before cutting. If a screenshot/card can be split at multiple levels, present a short extraction plan before final slicing.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
@@ -38,20 +39,25 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Prefer one PNG per component or state: `panel_inventory.png`, `button_play_normal.png`, `button_play_hover.png`, `button_play_pressed.png`, `progress_health_bg.png`, `progress_health_fill.png`.
    - Avoid baked UI text unless explicitly requested; labels are usually engine text nodes.
    - Ask for clean orthographic UI art, no mockup screen, no perspective scene, no watermark, no drop shadow that crosses the canvas edge.
-   - For later alpha cleanup, prefer a flat removable background such as `#FF00FF` or direct transparent output.
+   - Prefer native transparent output. If a flat removable background is required, do not default blindly to `#FF00FF`; choose a key color that is absent from the reference/style palette.
    - For panels/buttons, ask for corners and borders that can survive 9-slice scaling.
    - For direct screenshot extraction, crop/segment the actual UI pieces, remove background residue, strip unwanted text, and add transparent padding after trimming.
    - For style-library generation, reuse palette hex values and visual rules from the selected style card across the whole batch.
 
-5. Clean alpha before cropping or packaging when a removable key color was used.
+5. Choose and clean the alpha/key background deliberately.
+   - Run `scripts/suggest_key_color.py` on the reference image or style-library sources when native alpha is unavailable.
+   - Use the recommended key color consistently in the generation prompt and cleanup command.
+   - If the recommended key is still close to visible colors, switch to native alpha, LayerDiffuse, rembg/BiRefNet, or a custom key color rather than forcing a bad key.
    - Pink/green particles around UI pieces are chroma-key spill, not a normal trim problem. Remove the key color with a soft matte, despill, and a 1px edge contract before splitting atlases into components.
    - Reuse the installed `imagegen` helper when available; do not rewrite chroma-key removal.
 
 ```bash
+python <skill-root>/scripts/suggest_key_color.py --input <reference-image-or-folder>
+
 python <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py \
   --input <raw-atlas-or-png> \
   --out <clean-alpha.png> \
-  --key-color "#ff00ff" \
+  --key-color "<recommended-key-color>" \
   --soft-matte \
   --transparent-threshold 24 \
   --opaque-threshold 170 \
@@ -68,16 +74,14 @@ python <skill-root>/scripts/package_ui_assets.py \
   --input <folder-with-pngs> \
   --output <output-folder> \
   --pack-name <slug> \
-  --engines godot,unity,cocos
+  --engines godot
 ```
 
 Add `--project <game-project-root>` when the game project is local and should receive generated files.
 
 7. Integrate.
-   - Godot: use generated `.tscn` starter scenes and `ui-asset-manifest.json`; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
-   - Unity: place the generated folder under `Assets/GeneratedUI/<pack>` and run the generated editor import menu to set sprite texture type, alpha, and borders.
-   - Cocos: use the generated `cocos/ui_pack_prefab_spec.json` as the prefab/component contract, or feed it to an available Cocos MCP/editor plugin.
-   - Generic/HTML/H5: use the manifest paths, slice margins, and component states directly.
+   - Godot default: use generated `.tscn` starter scenes and `ui-asset-manifest.json`; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
+   - Unity/Cocos/generic: generate only when explicitly requested to keep output focused.
 
 8. QA before reporting done.
    - Open `preview.png` or inspect generated assets visually.
@@ -93,11 +97,13 @@ Add `--project <game-project-root>` when the game project is local and should re
 - Read `references/style-library.md` when the user asks to upload references, store style materials, keep palette/style consistent across components, extract UI from a screenshot, or generate from a stored game style.
 - Run `scripts/package_ui_assets.py --help` for deterministic packaging options.
 - Run `scripts/ingest_style_reference.py --help` for persistent style-library commands.
+- Run `scripts/suggest_key_color.py --help` before chroma-key generation when the background key color is not obvious.
 
 ## Guardrails
 
 - Do not generate creative UI art with Python, SVG, Canvas, CSS, or procedural placeholders. Scripts may only inspect, copy, preview, and package already-created raster assets.
 - Do not hand-roll a diffusion backend, background remover, atlas packer, or engine editor bridge when a usable project tool exists.
 - Do not treat a full UI mockup screenshot as a finished component pack. Extract or regenerate components separately so buttons, panels, and bars remain reusable.
+- Do not explode every visible sub-layer into separate files by default. Use the agreed component granularity and keep the default output small.
 - Do not silently persist user images/text. Store them in the style library only when the user explicitly asks for long-term reuse or skill memory.
 - Keep unrelated game implementation changes out of scope unless the user explicitly asks to wire the new UI into gameplay.

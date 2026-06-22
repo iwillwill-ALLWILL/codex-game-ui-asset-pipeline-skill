@@ -26,6 +26,34 @@ The packager auto-detects common synonyms, but explicit names reduce correction 
 - `icon`: non-stretchable image, item icon, HUD icon, badge, currency mark.
 - `image`: fallback type when no stronger type is detected.
 
+## Component Granularity
+
+When the user says "cut UI components", do not assume every visible layer is a separate component. First decide the extraction level:
+
+| Level | Name | Use when | Examples |
+|---|---|---|---|
+| L1 | `composite` | The whole object is reusable as one UI unit. | complete card, full quest panel, full toolbar |
+| L2 | `primitive` | The game engine needs interactive/reusable controls. | button states, progress bar bg/fill, panel bg, slot frame |
+| L3 | `layered` | The same object must be reskinned or animated by layers. | card outer frame, inner guide frame, card background, rarity ribbon |
+| L4 | `content` | The inner art is swapped independently. | item icon, portrait, emblem, illustration |
+| L5 | `decoration` | Small trim pieces are intentionally reusable. | corner caps, divider lines, glow, metal bolts |
+
+Default to L1 + L2 for game-ready output. Add L3-L5 only when the user asks for layered editing, card-building systems, rarity variants, animation, or runtime content replacement.
+
+For ambiguous screenshots, propose a compact plan before slicing:
+
+```text
+Extraction plan:
+- card_composite: whole card as one component
+- card_frame_outer: frame only
+- card_bg: inner background
+- icon_main: content icon
+
+Default output will keep card_composite and card_frame_outer only unless deeper layers are requested.
+```
+
+Do not create every possible nested layer by default; it makes the output noisy and harder to use.
+
 ## Nine-Slice Defaults
 
 The packager suggests conservative margins:
@@ -46,11 +74,22 @@ Override margins in-engine when the generated art has unusually thick corners, s
 
 Generated files should be treated as scaffolding. If a local project already has a UI theme, atlas, prefab, or import convention, map this manifest into that convention instead of forcing a new structure.
 
+## Output Scope
+
+Default output should be small and Godot-first:
+
+- `assets/ui/*.png`
+- `preview.png`
+- `ui-asset-manifest.json`
+- `godot/*.tscn`
+
+Generate Unity, Cocos, generic HTML/H5, raw atlases, intermediate crops, or debug folders only when the user asks for them or they are needed to diagnose a failure.
+
 ## Key-Color Hygiene
 
 Generated UI components should not contain visible chroma-key pixels after alpha cleanup.
 
-- Use bright key colors such as `#ff00ff` only as removable backgrounds, not as final UI decoration, unless the user explicitly wants that color.
+- Use selected key colors only as removable backgrounds, not as final UI decoration, unless the user explicitly wants that color.
 - Clean with a soft matte and despill before slicing atlases; otherwise key-colored pixels can become baked into the component edge.
 - If the manifest reports `possible chroma-key residue`, inspect the asset on a dark and light checker background, then rerun chroma cleanup or regenerate with native alpha.
 - Keep enough transparent padding after cleanup so nine-slice corners, button glows, and icon silhouettes are not clipped.

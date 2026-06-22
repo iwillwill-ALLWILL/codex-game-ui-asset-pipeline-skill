@@ -15,6 +15,8 @@
 - 图标
 - 九宫格可拉伸 UI
 - 一整套同画风 UI 组件包
+- 安全背景色选择和边缘残留清理
+- Godot 默认输出包
 
 它不是单独的生图模型。它会让当前平台里已有的识图、生图、抠图、透明背景、图集、游戏引擎接入能力一起工作，然后把结果整理成可用的游戏 UI 资产包。
 
@@ -57,7 +59,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 5. 安装后告诉我应该用什么话术调用它。
 ```
 
-这个 Skill 要求目标平台至少具备其中一类能力：
+这个 Skill 要求目标平台至少具备识图、生图或图片处理、文件处理能力；否则只能当提示词参考，不能完整产出资源。
 
 | 能力 | 用来做什么 |
 |---|---|
@@ -67,7 +69,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 文件读写 | 保存组件、manifest、预览图、风格库 |
 | 脚本/工作流 | 批量命名、检查、打包、输出引擎文件 |
 
-如果平台只有聊天能力，没有识图、生图、文件处理能力，这个 Skill 只能当提示词参考，不能完整产出资源。
+如果平台只有聊天能力，没有识图、生图/图片处理、文件处理能力，就不要把它包装成“可直接产出 UI 组件”的 Skill。
 
 ## 它有哪几种用法
 
@@ -97,13 +99,14 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 2. 不要把文字烘焙进图片，按钮文字后面交给游戏引擎。
 3. 所有组件画风、色卡、描边、材质保持一致。
 4. 面板和按钮要适合九宫格拉伸。
-5. 输出透明 PNG；如果必须用纯色背景，生成后要清理干净边缘颗粒。
+5. 优先输出透明 PNG；如果必须用纯色背景，先根据参考图选择不会撞色的 key color，再生成和清理。
+6. 默认只输出 Godot 需要的文件，先不要生成 Unity 和 Cocos。
 
 完成后给我：
 - 所有组件 PNG
 - preview.png
 - ui-asset-manifest.json
-- Godot / Unity / Cocos 可用的导入说明或脚手架
+- Godot 可用的导入说明或脚手架
 ```
 
 ### 2. 从用户上传的 UI 截图里直接扣组件
@@ -114,6 +117,8 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 
 ```text
 使用 $game-ui-asset-pipeline，从我上传的 UI 截图里扣出可复用组件。
+
+先给出组件粒度方案，再开始裁切。
 
 目标组件：
 - 任务面板
@@ -126,11 +131,23 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 要求：
 1. 尽量使用截图里的真实 UI 元素。
 2. 去掉不需要的文字，只保留背景框、按钮框、图标和装饰。
-3. 每个组件单独输出透明 PNG。
-4. 裁切后加透明边距，不要贴边。
-5. 检查并清理粉色、绿色、蓝色边缘颗粒。
-6. 最后打包成可放进游戏项目的 UI 组件包。
+3. 如果一个对象可以分成多层，默认只输出“整体组件 + 游戏里会复用的基础组件”，不要把所有内层都拆出来。
+4. 每个组件单独输出透明 PNG。
+5. 裁切后加透明边距，不要贴边。
+6. 检查并清理背景残留和粉色、绿色、蓝色边缘颗粒。
+7. 最后打包成 Godot 默认可用的 UI 组件包。
 ```
+
+组件粒度可以这样理解：
+
+| 粒度 | 什么时候用 | 例子 |
+|---|---|---|
+| 整体组件 | 直接作为一个完整 UI 使用 | 整张卡牌、完整任务面板 |
+| 基础组件 | 游戏里需要复用或交互 | 按钮、进度条底/填充、面板背景、slot |
+| 分层组件 | 需要换皮、动画、运行时组合 | 卡牌外框、内参考线、背景、稀有度角标 |
+| 内容组件 | 内部内容会替换 | icon、人物立绘、徽章、插画 |
+
+默认不要全拆。全拆会让输出很乱，也不一定更好用。
 
 ### 3. 把用户上传的资料沉淀成长期风格库
 
@@ -177,10 +194,11 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 
 要求：
 1. 这不是普通裁切问题，要按 chroma-key spill 处理。
-2. 如果是整张 atlas，先清理 atlas，再切组件。
-3. 使用 soft matte、despill、边缘收缩和轻微羽化。
-4. 清理后重新打包。
-5. 检查 manifest，不要再出现 possible #ff00ff chroma-key residue warning。
+2. 先判断当前 key color 是否和 UI 色卡撞色；如果撞色，换一个背景色或重新生成透明 PNG。
+3. 如果是整张 atlas，先清理 atlas，再切组件。
+4. 使用 soft matte、despill、边缘收缩和轻微羽化。
+5. 清理后重新打包。
+6. 检查 manifest，不要再出现 possible chroma-key residue warning。
 ```
 
 ### 5. 把已有 PNG 打包成游戏 UI 组件包
@@ -197,7 +215,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 2. 自动识别按钮状态 normal、hover、pressed、disabled。
 3. 自动识别进度条 background 和 fill。
 4. 生成 preview.png 和 ui-asset-manifest.json。
-5. 给出 Godot、Unity、Cocos 的导入结果或使用说明。
+5. 默认只生成 Godot 导入结果或使用说明。
 6. 如果 manifest 有 warnings，先解释并修复能修复的问题。
 ```
 
@@ -210,9 +228,8 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 组件 PNG | 游戏里真正使用的 UI 图片 |
 | `preview.png` | 快速检查所有组件是否正常 |
 | `ui-asset-manifest.json` | 记录组件类型、尺寸、状态、九宫格建议、警告 |
-| Godot `.tscn` | Godot 起步场景 |
-| Unity import helper | 设置 Sprite、透明、边框 |
-| Cocos prefab spec | 给 Cocos 创建 prefab 的结构说明 |
+| Godot `.tscn` | 默认生成的 Godot 起步场景 |
+| Unity / Cocos 文件 | 只有明确要求时才生成 |
 | `style-card.md` | 长期风格库说明 |
 | `palette.json` | 从参考图提取的色卡 |
 
@@ -222,9 +239,10 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 |---|---|
 | 每次生图都像不同游戏 | 用风格库锁定色卡、材质、线条和边框规则 |
 | 截图好看但不能直接进游戏 | 把截图拆成独立透明组件 |
-| UI 图片有粉色边缘颗粒 | 用 chroma-key 清理流程处理边缘污染 |
+| UI 图片有背景残留或粉色边缘颗粒 | 先选择安全 key color，再用 chroma-key 清理流程处理边缘污染 |
 | 按钮、进度条、面板命名混乱 | 自动整理成组件 manifest |
-| 素材给到引擎还要重新配置 | 输出 Godot、Unity、Cocos 的起步导入结构 |
+| 素材给到引擎还要重新配置 | 默认输出 Godot 起步导入结构 |
+| 不知道该切多细 | 先确定整体、基础、分层、内容四种组件粒度 |
 | 课程或团队想复用同一画风 | 把用户主动上传的资料沉淀进本地风格库 |
 
 ## 使用时要告诉 AI 的关键信息
@@ -235,9 +253,10 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 我要做什么游戏画风？
 我上传的图是参考风格，还是要直接扣组件？
 我要哪些组件？
+这些组件要按整体切，还是要分层切？
 要不要按钮状态？
 要不要进度条 background / fill？
-目标引擎是 Godot、Unity、Cocos，还是先通用？
+目标引擎是否就是默认 Godot？
 是否要把这次资料沉淀成长期风格库？
 ```
 
