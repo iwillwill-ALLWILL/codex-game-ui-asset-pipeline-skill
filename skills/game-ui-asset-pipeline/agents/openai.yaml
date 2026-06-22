@@ -1,4 +1,4 @@
 interface:
   display_name: "Game UI Asset Pipeline"
-  short_description: "Generate, extract, and style-match game UI packs"
-  default_prompt: "Use $game-ui-asset-pipeline to create a game-ready UI pack from a prompt, uploaded reference, existing PNGs, or a stored style-library entry."
+  short_description: "Generate style-matched game UI packs"
+  default_prompt: "Use $game-ui-asset-pipeline to create a game-ready Godot UI pack from a stored style library or uploaded reference image, then package the transparent PNG components."

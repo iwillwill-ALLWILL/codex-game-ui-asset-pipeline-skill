@@ -21,6 +21,20 @@ Use this reference to avoid rebuilding existing tools.
 - Use `rembg` or an existing transparent visual asset skill for post-generation background removal.
 - Use the packager only for validation. It does not remove backgrounds.
 
+## Concept Screenshot Extraction
+
+Use concept screenshot extraction as a secondary path. It works for visible, well-separated UI pieces, but full UI mockups often do not contain clean source layers. A dark frame may share pixels with a dark tavern wall; a glow may fade into the background; text may cover the border. In these cases, edge errors are a source limitation, not only a bad crop.
+
+Use existing tools in this order:
+
+1. Promptable segmentation such as Segment Anything/SAM 2 for the first object mask.
+2. Foreground/background removal such as BiRefNet or `rembg` when the UI object is visually separable from the scene.
+3. Trimap alpha matting such as PyMatting for antialiased strokes, bevels, soft shadows, and glows.
+4. OpenCV morphology only as postprocessing: close small holes, dilate 1-3 px to preserve strokes, feather the edge, then trim transparent padding.
+5. Manual mask correction or regeneration from the style library when the source pixels are occluded or ambiguous.
+
+Do not use the packager as a segmentation tool. It should receive already cleaned PNGs and then validate/copy/preview them.
+
 ## Key Color Selection
 
 Do not default blindly to `#ff00ff`. A key color is only safe when it is absent from the UI art, reference palette, glows, shadows, and antialiasing.

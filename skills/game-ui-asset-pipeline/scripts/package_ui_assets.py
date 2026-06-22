@@ -50,6 +50,7 @@ KEY_COLOR_CANDIDATES = {
 VISIBLE_ALPHA_THRESHOLD = 16
 KEY_RESIDUE_MIN_RATIO = 0.0005
 KEY_RESIDUE_MIN_PIXELS = 8
+MIN_TRANSPARENT_MARGIN = 2
 
 
 @dataclass
@@ -235,8 +236,17 @@ def inspect_png(path: Path, component_type: str, part: str | None) -> dict[str, 
 
         if width < 16 or height < 16:
             warnings.append("image is very small for game UI")
-        if edge_alpha_touch and component_type in {"icon", "image"}:
-            warnings.append("visible pixels touch canvas edge; inspect for cropping")
+        if edge_alpha_touch:
+            warnings.append("visible pixels touch canvas edge; inspect for clipped art and add transparent padding")
+        elif transparent_margin:
+            tight_sides = [
+                side for side, margin in transparent_margin.items() if margin < MIN_TRANSPARENT_MARGIN
+            ]
+            if tight_sides:
+                warnings.append(
+                    "visible pixels are very close to canvas edge "
+                    f"({', '.join(tight_sides)}); inspect for clipped art"
+                )
 
         chroma_key_residue = detect_chroma_key_residue(image)
         for residue in chroma_key_residue:

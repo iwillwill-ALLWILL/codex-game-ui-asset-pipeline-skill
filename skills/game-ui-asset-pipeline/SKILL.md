@@ -9,9 +9,9 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 
 ## Supported Modes
 
-- Direct generation from prompt or current reference image.
-- Direct extraction from a user-uploaded UI screenshot or atlas into reusable components.
 - Style-locked generation from references stored under `assets/style-library`.
+- Direct generation from prompt or current reference image.
+- Direct extraction from a user-uploaded UI screenshot or atlas into reusable components when the user wants visible elements from that exact image.
 - Packaging existing PNG components into clean level folders with PNGs, `overview.png`, and Godot scaffolding by default. Generate JSON/Unity/Cocos outputs only when requested.
 - Optional installation into a local Godot/Unity/Cocos project.
 
@@ -21,7 +21,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Components: `panel`, `button`, `progress_bar`, `icon`, `frame`, `slot`, `hud`.
    - Engine: default to `godot` unless the user names `unity`, `cocos`, or `generic`.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
-   - Component granularity: use progressive levels from large to small and output all useful levels by default. Only limit the output when the user explicitly asks for one layer or a narrow subset.
+   - Component granularity: build an adaptive split ladder from the actual image. Output every useful level by default, from large reusable groups down to atomic parts. Do not force a fixed five-level scheme; omit mechanical empty levels and name folders by their semantic purpose.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
@@ -41,7 +41,10 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Ask for clean orthographic UI art, no mockup screen, no perspective scene, no watermark, no drop shadow that crosses the canvas edge.
    - Prefer native transparent output. If a flat removable background is required, do not default blindly to `#FF00FF`; choose a key color that is absent from the reference/style palette.
    - For panels/buttons, ask for corners and borders that can survive 9-slice scaling.
+   - For production UI packs, prefer style-library/reference-guided generation of isolated components over trying to reconstruct components from a full concept screenshot.
    - For direct screenshot extraction, crop/segment the actual UI pieces, remove background residue, strip unwanted text, and add transparent padding after trimming.
+   - For uncertain screenshot edges, use conservative masks: crop with margin, expand/close the mask before matting, keep the full visible stroke, then trim only transparent padding. A slightly larger mask is easier to fix than a clipped frame edge.
+   - When a frame blends into the background, is hidden by text, or is occluded by scene art, do not pretend the screenshot contains clean reusable source layers. Either mark the extracted asset as approximate, manually refine the mask, or regenerate that component from the stored style library.
    - For style-library generation, reuse palette hex values and visual rules from the selected style card across the whole batch.
 
 5. Choose and clean the alpha/key background deliberately.
@@ -90,7 +93,8 @@ Add `--project <game-project-root>` when the game project is local and should re
    - Keep the public output focused: `level_xxx/png`, `level_xxx/godot`, and overview images.
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
    - Verify each button has at least a normal state, each progress bar has background/fill when possible, and stretchable components have reasonable slice margins.
-   - If assets are blank, cropped, noisy, text-baked by accident, or inconsistent across states, regenerate or clean them before integration.
+   - Inspect cutout edges on dark and light backgrounds. If a frame loses visible pixels, add margin and rebuild the mask; if it includes scene-background pixels, use a tighter segmentation/matting pass.
+   - If assets are blank, cropped, noisy, text-baked by accident, inconsistent across states, or only approximate because the concept screenshot is ambiguous, regenerate or clean them before integration.
 
 ## Resource Navigation
 

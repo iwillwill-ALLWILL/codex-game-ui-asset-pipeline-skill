@@ -5,7 +5,8 @@ Use this reference when the user asks to upload UI references, store a long-term
 ## What the Skill Supports Now
 
 - Generate UI component art from prompts or reference images with `image_gen`, ComfyUI, or the project's configured image backend.
-- Extract reusable pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them.
+- Generate style-locked UI from stored user-provided references so a whole pack shares palette, stroke, material, and corner language.
+- Extract reusable visible pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them. Treat this as useful for prototypes, salvage, and exact visible elements; do not make it the preferred production route when clean source components can be regenerated.
 - Package existing PNGs into level folders containing `png/`, `godot/`, and `overview.png` by default. Unity/Cocos outputs are opt-in.
 - Detect common chroma-key residue such as pink/green/blue edge dust during packaging.
 - Store user-provided style references in `assets/style-library/<style>/`, extract a dominant palette, and create a style card for future prompt construction.
@@ -44,24 +45,9 @@ python <skill-root>/scripts/ingest_style_reference.py list
 python <skill-root>/scripts/ingest_style_reference.py show --style <style-slug>
 ```
 
-## Mode A: Directly Cut Uploaded UI Components
+## Preferred Mode: Generate Style-Locked UI From Stored References
 
-Use this when the user wants the UI elements already present in a screenshot/reference image.
-
-1. Inspect the source image and list target components: panels, buttons, progress bars, icons, map nodes, slots, frames, tabs.
-2. If the user requested long-term reuse, ingest the source image into a style entry before extraction.
-3. Decide the progressive split ladder before cutting. Output every useful level by default, from `level_01_complete` down to the most atomic useful layer.
-4. Crop or segment components from the source. Use existing tools first:
-   - flat key/background: use the installed `imagegen` chroma-key cleanup helper
-   - complex background: use `rembg`, BiRefNet, Segment Anything, or a local editor workflow if available
-   - atlas/grid: remove divider pixels before slicing and add transparent padding after trim
-5. Remove baked text unless the user asks for literal text art; provide blank frames/buttons for engine text nodes.
-6. Package the resulting PNGs with `package_ui_assets.py`, defaulting to level folders with PNG, Godot files, and overview images only.
-7. Treat packager warnings, visible residue, and clipped edges as blockers before delivery.
-
-## Mode B: Generate Style-Locked UI From Stored References
-
-Use this when the user wants new components in the same style as materials previously stored in the skill.
+Use this when the user wants production-ready components in the same style as materials previously stored in the skill. Prefer this over concept screenshot extraction for buttons, panels, bars, cards, slots, and repeatable HUD parts.
 
 1. Run `list` or `show` to locate the style. Read the style card and inspect stored reference images.
 2. Build a compact style lock for prompts:
@@ -72,8 +58,24 @@ Use this when the user wants new components in the same style as materials previ
 3. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
 4. Generate all related components in one batch/atlas when possible so palette, stroke, lighting, and ornament density match.
 5. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
-6. Clean alpha, split components according to the agreed level ladder, pad edges, then package.
+6. Clean alpha, split components according to the adaptive split ladder, pad edges, then package.
 7. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
+
+## Secondary Mode: Directly Cut Uploaded UI Components
+
+Use this when the user wants the UI elements already present in a screenshot/reference image.
+
+1. Inspect the source image and list target components: panels, buttons, progress bars, icons, map nodes, slots, frames, tabs.
+2. If the user requested long-term reuse, ingest the source image into a style entry before extraction.
+3. Decide the adaptive split ladder before cutting. Output every useful level by default, from the largest meaningful grain down to the most atomic useful layer. Do not force exactly five levels.
+4. Crop or segment components from the source. Use existing tools first:
+   - flat key/background: use the installed `imagegen` chroma-key cleanup helper
+   - complex background: use `rembg`, BiRefNet, Segment Anything, or a local editor workflow if available
+   - atlas/grid: remove divider pixels before slicing and add transparent padding after trim
+5. For uncertain edges, keep the full visible border stroke first, then remove residue with matting and visual QA. Never solve a missing border by trimming tighter.
+6. Remove baked text unless the user asks for literal text art; provide blank frames/buttons for engine text nodes.
+7. Package the resulting PNGs with `package_ui_assets.py`, defaulting to level folders with PNG, Godot files, and overview images only.
+8. Treat packager warnings, visible residue, clipped edges, and accidental scene-background slivers as blockers before delivery. If the screenshot cannot provide a clean edge, regenerate the component from the style library.
 
 ## Prompt Pattern
 
