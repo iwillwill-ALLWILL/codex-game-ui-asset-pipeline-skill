@@ -1,15 +1,16 @@
 ---
 name: game-ui-asset-pipeline
-description: Generate, extract, style-match, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored user style references, or existing PNGs. Use when Codex needs to create or integrate panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, Unity/Cocos outputs on request, clean level-based PNG folders, or a persistent style library from user-provided images/text. This skill should compose existing image generation, background removal, sprite, atlas, and editor/MCP tools instead of reimplementing them.
+description: Generate, extract, style-match, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored project style libraries, or existing PNGs. Use when Codex needs to create full common UI kits, requested UI components, panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, organized PNG folders, Unity/Cocos outputs on request, or a persistent self-organizing style library from user-provided images/text/prompts. This skill should compose existing image generation, background removal, sprite, atlas, and editor/MCP tools instead of reimplementing them.
 ---
 
 # Game UI Asset Pipeline
 
-Create game UI asset packs that can be dropped into a project. This skill is a pipeline coordinator: use existing generators and engine tools for the heavy work, then use the bundled packager and style-library helper for clean level folders, overview images, Godot scaffolding, and reusable user-owned style references.
+Create game UI asset packs that can be dropped into a project. This skill is a pipeline coordinator: use existing generators and engine tools for the heavy work, then use the bundled packager and style-library helper for clean folders, overview images, Godot scaffolding, complete common component catalogs, and reusable user-owned project style libraries.
 
 ## Supported Modes
 
-- Style-locked generation from references stored under `assets/style-library`.
+- Project style-library driven generation from references stored under `assets/style-library`.
+- Full common UI kit generation from the bundled component catalog.
 - Direct generation from prompt or current reference image.
 - Direct extraction from a user-uploaded UI screenshot or atlas into reusable components when the user wants visible elements from that exact image.
 - Packaging existing PNG components into clean level folders with PNGs, `overview.png`, and Godot scaffolding by default. Generate JSON/Unity/Cocos outputs only when requested.
@@ -21,12 +22,15 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Components: `panel`, `button`, `progress_bar`, `icon`, `frame`, `slot`, `hud`.
    - Engine: default to `godot` unless the user names `unity`, `cocos`, or `generic`.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
+   - Generation scope: full common UI kit, requested component subset, requested material/icon assets, existing PNG packaging, or concept screenshot extraction.
    - Component granularity: build an adaptive split ladder from the actual image. Output every useful level by default, from large reusable groups down to atomic parts. Do not force a fixed five-level scheme; omit mechanical empty levels and name folders by their semantic purpose.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
-   - Run `scripts/ingest_style_reference.py ingest` to copy the files, extract a palette, and create a style card.
+   - Treat the style library as project memory, not a single static prompt. It can contain reference images, text notes, reference prompts, accepted generated outputs, rejected-output lessons, palette data, and manual style rules.
+   - Run `scripts/ingest_style_reference.py ingest` to copy the files, extract a palette, store reference prompts, and create/update a style card.
    - For future style-matched generation, run `scripts/ingest_style_reference.py list` or `show`, then inspect the stored reference images before prompting the image backend.
+   - Let the library self-organize over time: update tags, palette roles, prompt bank, avoid-list, component naming habits, and accepted generation anchors when the user approves or rejects outputs.
 
 3. Reuse the right tool.
    - For raw raster art, use built-in `image_gen`, a local ComfyUI workflow, or the project's configured image backend.
@@ -37,6 +41,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 
 4. Generate or extract component art as isolated assets.
    - Prefer one PNG per component or state: `panel_inventory.png`, `button_play_normal.png`, `button_play_hover.png`, `button_play_pressed.png`, `progress_health_bg.png`, `progress_health_fill.png`.
+   - For a full UI kit or "常用 UI" request, read `references/ui-component-catalog.md`, choose the `complete` or project-specific checklist, and generate in category batches when needed.
    - Avoid baked UI text unless explicitly requested; labels are usually engine text nodes.
    - Ask for clean orthographic UI art, no mockup screen, no perspective scene, no watermark, no drop shadow that crosses the canvas edge.
    - Prefer native transparent output. If a flat removable background is required, do not default blindly to `#FF00FF`; choose a key color that is absent from the reference/style palette.
@@ -77,7 +82,8 @@ python <skill-root>/scripts/package_ui_assets.py \
   --input <folder-with-pngs> \
   --output <output-folder> \
   --pack-name <slug> \
-  --engines godot
+  --engines godot \
+  --category-subdirs
 ```
 
 If the input folder has subfolders, each subfolder is treated as one split level and packaged separately. Default public output contains no JSON; add `--write-manifest` only for debugging.
@@ -101,6 +107,7 @@ Add `--project <game-project-root>` when the game project is local and should re
 - Read `references/toolchain.md` when choosing between built-in image generation, ComfyUI, chroma-key cleanup, background removal, atlas packers, or MCP/editor integration.
 - Read `references/component-contract.md` when naming assets, designing split levels, adjusting nine-slice margins, or mapping PNGs to a specific engine.
 - Read `references/style-library.md` when the user asks to upload references, store style materials, keep palette/style consistent across components, extract UI from a screenshot, or generate from a stored game style.
+- Read `references/ui-component-catalog.md` when the user asks for a full UI kit, common UI components, a complete component set, or organized output categories.
 - Run `scripts/package_ui_assets.py --help` for deterministic packaging options.
 - Run `scripts/ingest_style_reference.py --help` for persistent style-library commands.
 - Run `scripts/suggest_key_color.py --help` before chroma-key generation when the background key color is not obvious.

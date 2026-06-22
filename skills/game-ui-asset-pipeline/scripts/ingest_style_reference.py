@@ -190,6 +190,19 @@ def read_notes(args: argparse.Namespace) -> str:
     return "\n\n".join(chunk for chunk in chunks if chunk)
 
 
+def read_prompts(args: argparse.Namespace) -> list[str]:
+    prompts: list[str] = []
+    for prompt in args.prompt or []:
+        prompt = prompt.strip()
+        if prompt:
+            prompts.append(prompt)
+    for prompt_file in args.prompt_file or []:
+        text = prompt_file.read_text(encoding="utf-8", errors="replace").strip()
+        if text:
+            prompts.append(text)
+    return prompts
+
+
 def text_excerpt(path: Path, max_chars: int = 2400) -> str:
     if file_kind(path) != "text":
         return ""
@@ -208,6 +221,7 @@ def write_style_card(
     entry: dict[str, Any],
     palette: dict[str, Any],
     notes: str,
+    prompts: list[dict[str, Any]],
     text_notes: list[dict[str, str]],
 ) -> None:
     path = style_dir / "style-card.md"
@@ -230,6 +244,11 @@ def write_style_card(
     text_lines: list[str] = []
     for item in text_notes:
         text_lines.append(f"### {item['name']}\n\n```text\n{item['excerpt']}\n```")
+    prompt_lines: list[str] = []
+    for idx, prompt in enumerate(prompts[-12:], start=max(1, len(prompts) - 11)):
+        title = prompt.get("title") or f"Prompt {idx}"
+        body = prompt.get("text", "")
+        prompt_lines.append(f"### {title}\n\n```text\n{body}\n```")
 
     content = f"""# {entry['title']}
 
@@ -253,15 +272,62 @@ Tags: `{', '.join(entry.get('tags', [])) or 'none'}`
 
 {chr(10).join(text_lines) if text_lines else 'No text excerpts recorded.'}
 
+## Reference Prompt Bank
+
+{chr(10).join(prompt_lines) if prompt_lines else 'No reference prompts recorded.'}
+
 ## Generation Anchor
 
 When this style is selected, inspect the stored reference images before generation, reuse the extracted palette as hard color guidance, and keep line weight, material treatment, corner language, icon silhouette language, and ornament density consistent across every UI component in the same batch.
+
+## Self-Organization Rules
+
+- Treat new user-approved images, notes, and prompts as additive evidence for this project style.
+- Prefer recurring traits across multiple references over one-off details from a single image.
+- Keep a stable style lock: palette roles, line weight, material language, corner shapes, icon rules, button states, and avoid-list.
+- When a generated result is accepted by the user, store its prompt or final component sheet as a stronger reference for future batches.
+- When a generated result is rejected, add the failure reason to the avoid-list instead of deleting useful references.
 
 ## Manual Style Notes
 
 {manual_notes or 'Add concise visual traits after inspecting the references: palette role, linework, shapes, materials, UI corner treatment, icon rules, and avoid-list.'}
 """
     path.write_text(content, encoding="utf-8")
+
+
+def append_prompt_bank(style_dir: Path, entry: dict[str, Any], new_prompts: list[str]) -> list[dict[str, Any]]:
+    path = style_dir / "reference-prompts.json"
+    if path.exists():
+        data = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        data = {"version": 1, "style": entry["slug"], "prompts": []}
+    prompts = data.setdefault("prompts", [])
+    existing = {item.get("sha256") for item in prompts}
+    now = now_iso()
+    for prompt in new_prompts:
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        if digest in existing:
+            continue
+        prompts.append(
+            {
+                "title": f"Reference Prompt {len(prompts) + 1}",
+                "text": prompt,
+                "sha256": digest,
+                "added_at": now,
+            }
+        )
+        existing.add(digest)
+    save_json(path, data)
+    md_lines = [f"# {entry['title']} Reference Prompts", ""]
+    for item in prompts:
+        md_lines.append(f"## {item.get('title', 'Prompt')}")
+        md_lines.append("")
+        md_lines.append("```text")
+        md_lines.append(item.get("text", ""))
+        md_lines.append("```")
+        md_lines.append("")
+    (style_dir / "reference-prompts.md").write_text("\n".join(md_lines), encoding="utf-8")
+    return prompts
 
 
 def ingest(args: argparse.Namespace) -> int:
@@ -339,6 +405,7 @@ def ingest(args: argparse.Namespace) -> int:
     save_json(style_dir / "palette.json", palette)
 
     notes = read_notes(args)
+    new_prompts = read_prompts(args)
     previous_notes = entry.get("notes", "")
     merged_notes = notes or previous_notes
     tags = sorted(set(entry.get("tags", [])) | {slugify(tag) for tag in args.tag})
@@ -358,9 +425,12 @@ def ingest(args: argparse.Namespace) -> int:
         "document_count": sum(1 for item in files if item.get("kind") == "document"),
         "palette": palette["aggregate"]["colors"][:12],
     }
+    prompts = append_prompt_bank(style_dir, entry, new_prompts)
+    entry["prompt_count"] = len(prompts)
+    entry["prompt_bank"] = rel(style_dir / "reference-prompts.md", root)
     styles[style_slug] = entry
     save_json(index_path(root), idx)
-    write_style_card(root, style_dir, entry, palette, merged_notes, text_notes)
+    write_style_card(root, style_dir, entry, palette, merged_notes, prompts, text_notes)
 
     print(
         json.dumps(
@@ -369,6 +439,7 @@ def ingest(args: argparse.Namespace) -> int:
                 "copied": copied,
                 "files": len(files),
                 "image_count": entry["image_count"],
+                "prompt_count": entry["prompt_count"],
                 "palette_colors": len(entry["palette"]),
                 "style_card": str(style_dir / "style-card.md"),
             },
@@ -421,6 +492,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_parser.add_argument("--input", action="append", required=True, type=Path, help="File or folder to ingest. Repeatable.")
     ingest_parser.add_argument("--notes", help="User-provided notes to store with this style.")
     ingest_parser.add_argument("--notes-file", type=Path, help="Text/Markdown notes file to store with this style.")
+    ingest_parser.add_argument("--prompt", action="append", help="User-provided reference prompt to store with this style. Repeatable.")
+    ingest_parser.add_argument("--prompt-file", action="append", type=Path, help="Text/Markdown prompt file to store with this style. Repeatable.")
     ingest_parser.add_argument("--tag", action="append", default=[], help="Search tag. Repeatable.")
     ingest_parser.set_defaults(func=ingest)
 

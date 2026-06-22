@@ -1,6 +1,6 @@
 # Style Library Workflow
 
-Use this reference when the user asks to upload UI references, store a long-term style, keep palette/style consistent, cut components from a screenshot, or generate new UI components from a stored game style.
+Use this reference when the user asks to upload UI references, store a long-term project style, keep palette/style consistent, cut components from a screenshot, generate new UI components from a stored game style, save reference prompts, or evolve a reusable style library.
 
 ## What the Skill Supports Now
 
@@ -9,11 +9,32 @@ Use this reference when the user asks to upload UI references, store a long-term
 - Extract reusable visible pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them. Treat this as useful for prototypes, salvage, and exact visible elements; do not make it the preferred production route when clean source components can be regenerated.
 - Package existing PNGs into level folders containing `png/`, `godot/`, and `overview.png` by default. Unity/Cocos outputs are opt-in.
 - Detect common chroma-key residue such as pink/green/blue edge dust during packaging.
-- Store user-provided style references in `assets/style-library/<style>/`, extract a dominant palette, and create a style card for future prompt construction.
+- Store user-provided style references in `assets/style-library/<style>/`, extract a dominant palette, save reference prompts, and create a style card for future prompt construction.
 
 ## Consent Boundary
 
 Only persist references when the user explicitly asks to store, remember, reuse long-term, add to the skill, or "沉淀" the uploaded material. Do not silently store arbitrary images from a one-off generation request.
+
+## Project Style Library Model
+
+Treat each style entry as a living project-level memory. It should become more useful as the user uploads more references and accepts or rejects generated outputs.
+
+Stored material can include:
+
+- `sources/`: user-approved reference images, screenshots, docs, notes, and accepted generated component sheets.
+- `palette.json`: extracted palette candidates from all stored images.
+- `style-card.md`: compact style contract used for future prompting.
+- `reference-prompts.json` and `reference-prompts.md`: user-approved prompts and successful final prompts.
+- `index.json`: searchable style list with tags, counts, palette preview, and file paths.
+
+Self-organization rules:
+
+1. Add new user-approved material, do not overwrite old material unless the user asks.
+2. Keep stable traits that appear across multiple references: palette roles, line weight, material treatment, corner language, icon silhouette, glow/shadow rules, and ornament density.
+3. Convert accepted outputs into stronger generation anchors when the user says the result is good.
+4. Convert rejected outputs into avoid-list notes: what drifted, which colors failed, which shapes were off-style, or which components were unusable.
+5. Keep prompt examples separate from visual notes. Prompts explain generation intent; style cards explain visual rules.
+6. For every future generation, read the style card, palette, prompt bank, and at least the most relevant reference images before prompting the image backend.
 
 ## Ingest Uploaded References
 
@@ -25,6 +46,7 @@ python <skill-root>/scripts/ingest_style_reference.py ingest \
   --title "<human title>" \
   --input <uploaded-image-or-folder> \
   --notes "<user notes or visual summary>" \
+  --prompt "<reference or successful generation prompt>" \
   --tag <tag>
 ```
 
@@ -37,6 +59,7 @@ Then inspect the images and, when useful, edit the generated `style-card.md` man
 - icon silhouette rules
 - glow/shadow rules
 - avoid-list for off-style colors, modern UI motifs, text baking, or decoration density
+- accepted prompt patterns and rejected-output lessons
 
 Use `list` and `show` to retrieve stored styles:
 
@@ -53,13 +76,16 @@ Use this when the user wants production-ready components in the same style as ma
 2. Build a compact style lock for prompts:
    - exact palette hex colors from `palette.json`
    - material and linework notes from `style-card.md`
+   - useful prompt phrasing from `reference-prompts.md`
    - component shape rules from the reference image
    - explicit negative prompt for text, mockup screens, perspective scenes, and off-palette colors
-3. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
-4. Generate all related components in one batch/atlas when possible so palette, stroke, lighting, and ornament density match.
-5. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
-6. Clean alpha, split components according to the adaptive split ladder, pad edges, then package.
-7. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
+3. If the user asks for a complete/common UI kit, read `ui-component-catalog.md` and choose the complete or project-specific checklist.
+4. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
+5. Generate related components in category batches when a single huge atlas would reduce quality. Keep the same style lock, key color, naming scheme, and output categories across every batch.
+6. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
+7. Clean alpha, split components according to the adaptive split ladder, pad edges, then package with category subfolders for full kits.
+8. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
+9. If the user accepts the result, offer to ingest the final component sheet or final prompts back into the same style library.
 
 ## Secondary Mode: Directly Cut Uploaded UI Components
 

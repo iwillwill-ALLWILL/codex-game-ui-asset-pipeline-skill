@@ -58,6 +58,7 @@ class DetectedAsset:
     source: Path
     component_type: str
     component_name: str
+    category: str
     state: str | None
     part: str | None
     output_name: str
@@ -139,6 +140,27 @@ def component_name(stem: str, tokens: list[str], component_type: str, state: str
     if component_type == "progress_bar":
         return "progress"
     return slugify(component_type)
+
+
+def detect_category(component_type: str, name: str, tokens: list[str]) -> str:
+    token_set = set(tokens) | set(name.split("-"))
+    if component_type == "button":
+        return "buttons"
+    if component_type == "progress_bar":
+        return "bars"
+    if component_type == "icon":
+        return "icons"
+    if "slot" in token_set or "cell" in token_set:
+        return "slots"
+    if "card" in token_set:
+        return "cards"
+    if "frame" in token_set or "border" in token_set or "rim" in token_set:
+        return "frames"
+    if "hud" in token_set:
+        return "hud"
+    if component_type == "panel":
+        return "panels"
+    return "images"
 
 
 def suggest_slice(component_type: str, part: str | None, width: int, height: int) -> dict[str, int] | None:
@@ -275,6 +297,7 @@ def detect_asset(path: Path) -> DetectedAsset:
     state = detect_state(tokens)
     part = detect_part(component_type, tokens)
     name = component_name(path.stem, tokens, component_type, state, part)
+    category = detect_category(component_type, name, tokens)
 
     role = state or part
     if component_type == "button" and role is None:
@@ -296,6 +319,7 @@ def detect_asset(path: Path) -> DetectedAsset:
         source=path,
         component_type=component_type,
         component_name=name,
+        category=category,
         state=state,
         part=part,
         output_name=output_name,
@@ -324,10 +348,13 @@ def unique_output_names(assets: list[DetectedAsset]) -> None:
             asset.output_rel = f"png/{asset.output_name}"
 
 
-def assign_output_paths(assets: list[DetectedAsset], asset_subdir: str) -> None:
+def assign_output_paths(assets: list[DetectedAsset], asset_subdir: str, category_subdirs: bool = False) -> None:
     clean_subdir = asset_subdir.strip("/\\")
     for asset in assets:
-        asset.output_rel = rel(f"{clean_subdir}/{asset.output_name}")
+        if category_subdirs:
+            asset.output_rel = rel(f"{clean_subdir}/{asset.category}/{asset.output_name}")
+        else:
+            asset.output_rel = rel(f"{clean_subdir}/{asset.output_name}")
 
 
 def rel(path: str) -> str:
@@ -341,6 +368,7 @@ def asset_record(asset: DetectedAsset) -> dict[str, Any]:
         "path": asset.output_rel,
         "type": asset.component_type,
         "component": asset.component_name,
+        "category": asset.category,
         "state": asset.state,
         "part": asset.part,
         "width": asset.width,
@@ -405,10 +433,10 @@ def build_components(assets: list[DetectedAsset]) -> list[dict[str, Any]]:
 
 
 def copy_assets(assets: list[DetectedAsset], output_dir: Path, asset_subdir: str) -> None:
-    asset_dir = output_dir / asset_subdir
-    asset_dir.mkdir(parents=True, exist_ok=True)
     for asset in assets:
-        shutil.copy2(asset.source, asset_dir / asset.output_name)
+        dest = output_dir / asset.output_rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(asset.source, dest)
 
 
 def write_preview(assets: list[DetectedAsset], output_dir: Path, name: str = "overview.png") -> Path | None:
@@ -699,6 +727,7 @@ def package_level(
     pack_name: str,
     engines: list[str],
     asset_subdir: str,
+    category_subdirs: bool,
     write_manifest_file: bool,
     godot_res_prefix: str | None,
     unity_root: str | None,
@@ -706,7 +735,7 @@ def package_level(
     output_dir.mkdir(parents=True, exist_ok=True)
     assets = [detect_asset(path) for path in pngs]
     unique_output_names(assets)
-    assign_output_paths(assets, asset_subdir)
+    assign_output_paths(assets, asset_subdir, category_subdirs=category_subdirs)
     copy_assets(assets, output_dir, asset_subdir)
     overview = write_preview(assets, output_dir)
     components = build_components(assets)
@@ -761,6 +790,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pack-name", default="generated-ui", help="Slug used for output and engine folders.")
     parser.add_argument("--engines", default="godot", help="Comma list: godot,unity,cocos,generic or all. Defaults to godot.")
     parser.add_argument("--asset-subdir", default="png", help="PNG folder name inside each level. Defaults to png.")
+    parser.add_argument("--category-subdirs", action="store_true", help="Organize PNGs under category folders such as png/buttons and png/icons.")
     parser.add_argument("--write-manifest", action="store_true", help="Write ui-asset-manifest.json for debugging. Off by default.")
     parser.add_argument("--project", type=Path, help="Optional game project root to receive generated files.")
     parser.add_argument(
@@ -794,6 +824,7 @@ def main(argv: list[str] | None = None) -> int:
                 pack_name=pack_name,
                 engines=engines,
                 asset_subdir=args.asset_subdir,
+                category_subdirs=args.category_subdirs,
                 write_manifest_file=args.write_manifest,
                 godot_res_prefix=args.godot_res_prefix,
                 unity_root=args.unity_root,
