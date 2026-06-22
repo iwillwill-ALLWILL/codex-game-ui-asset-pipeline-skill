@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Package existing PNG game UI assets into engine-friendly scaffolding.
+"""Package existing PNG game UI assets into clean level folders.
 
 This script does not generate creative art or remove backgrounds. It inspects,
-copies, previews, and writes metadata for assets produced by image tools.
+copies, previews, and creates Godot scaffolding for assets produced by image tools.
 """
 
 from __future__ import annotations
@@ -279,7 +279,7 @@ def detect_asset(path: Path) -> DetectedAsset:
     if role:
         output_stem += f"__{slugify(role)}"
     output_name = f"{output_stem}.png"
-    output_rel = f"assets/ui/{output_name}"
+    output_rel = f"png/{output_name}"
 
     info = inspect_png(path, component_type, part)
     return DetectedAsset(
@@ -311,7 +311,13 @@ def unique_output_names(assets: list[DetectedAsset]) -> None:
         if count:
             stem = Path(asset.output_name).stem
             asset.output_name = f"{stem}-{count + 1}.png"
-            asset.output_rel = f"assets/ui/{asset.output_name}"
+            asset.output_rel = f"png/{asset.output_name}"
+
+
+def assign_output_paths(assets: list[DetectedAsset], asset_subdir: str) -> None:
+    clean_subdir = asset_subdir.strip("/\\")
+    for asset in assets:
+        asset.output_rel = rel(f"{clean_subdir}/{asset.output_name}")
 
 
 def rel(path: str) -> str:
@@ -388,16 +394,16 @@ def build_components(assets: list[DetectedAsset]) -> list[dict[str, Any]]:
     return components
 
 
-def copy_assets(assets: list[DetectedAsset], output_dir: Path) -> None:
-    asset_dir = output_dir / "assets" / "ui"
+def copy_assets(assets: list[DetectedAsset], output_dir: Path, asset_subdir: str) -> None:
+    asset_dir = output_dir / asset_subdir
     asset_dir.mkdir(parents=True, exist_ok=True)
     for asset in assets:
         shutil.copy2(asset.source, asset_dir / asset.output_name)
 
 
-def write_preview(assets: list[DetectedAsset], output_dir: Path) -> None:
+def write_preview(assets: list[DetectedAsset], output_dir: Path, name: str = "overview.png") -> Path | None:
     if not assets:
-        return
+        return None
     thumb = 160
     label_h = 32
     cols = min(4, max(1, math.ceil(math.sqrt(len(assets)))))
@@ -418,10 +424,19 @@ def write_preview(assets: list[DetectedAsset], output_dir: Path) -> None:
         if len(label) > 20:
             label = label[:17] + "..."
         draw.text((x + 6, y + thumb + 4), label, fill=(235, 238, 242, 255))
-    preview.save(output_dir / "preview.png")
+    path = output_dir / name
+    preview.save(path)
+    return path
 
 
-def write_manifest(pack_name: str, assets: list[DetectedAsset], components: list[dict[str, Any]], output_dir: Path, engines: list[str]) -> dict[str, Any]:
+def write_manifest(
+    pack_name: str,
+    assets: list[DetectedAsset],
+    components: list[dict[str, Any]],
+    output_dir: Path,
+    engines: list[str],
+    write_file: bool = False,
+) -> dict[str, Any]:
     warnings: list[str] = []
     for asset in assets:
         warnings.extend(f"{asset.output_name}: {warning}" for warning in asset.warnings)
@@ -436,10 +451,11 @@ def write_manifest(pack_name: str, assets: list[DetectedAsset], components: list
         "components": components,
         "warnings": warnings,
     }
-    (output_dir / "ui-asset-manifest.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    if write_file:
+        (output_dir / "ui-asset-manifest.json").write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
     return manifest
 
 
@@ -641,12 +657,101 @@ def parse_engines(value: str) -> list[str]:
     return engines or ["generic"]
 
 
+def discover_levels(input_dir: Path) -> list[tuple[str, Path, list[Path]]]:
+    direct_pngs = sorted(input_dir.glob("*.png"))
+    child_levels: list[tuple[str, Path, list[Path]]] = []
+    for child in sorted(input_dir.iterdir()):
+        if not child.is_dir():
+            continue
+        pngs = sorted(child.glob("*.png"))
+        if not pngs:
+            continue
+        slug = slugify(child.name)
+        if not slug.startswith("level-"):
+            slug = f"level-{len(child_levels) + 1:02d}-{slug}"
+        child_levels.append((slug.replace("-", "_"), child, pngs))
+
+    if child_levels:
+        levels: list[tuple[str, Path, list[Path]]] = []
+        if direct_pngs:
+            levels.append(("level_00_root", input_dir, direct_pngs))
+        levels.extend(child_levels)
+        return levels
+    if direct_pngs:
+        return [("level_01_complete", input_dir, direct_pngs)]
+    raise SystemExit(f"No PNG files found in {input_dir}")
+
+
+def package_level(
+    level_name: str,
+    pngs: list[Path],
+    output_dir: Path,
+    pack_name: str,
+    engines: list[str],
+    asset_subdir: str,
+    write_manifest_file: bool,
+    godot_res_prefix: str | None,
+    unity_root: str | None,
+) -> dict[str, Any]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    assets = [detect_asset(path) for path in pngs]
+    unique_output_names(assets)
+    assign_output_paths(assets, asset_subdir)
+    copy_assets(assets, output_dir, asset_subdir)
+    overview = write_preview(assets, output_dir)
+    components = build_components(assets)
+    manifest = write_manifest(pack_name, assets, components, output_dir, engines, write_file=write_manifest_file)
+
+    if "godot" in engines:
+        res_prefix = godot_res_prefix or f"res://assets/generated_ui/{pack_name}/{level_name}"
+        write_godot_outputs(manifest, output_dir, res_prefix)
+    if "unity" in engines:
+        root = unity_root or f"Assets/GeneratedUI/{pack_name}/{level_name}"
+        write_unity_outputs(manifest, output_dir, root)
+    if "cocos" in engines:
+        write_cocos_outputs(manifest, output_dir)
+
+    return {
+        "level": level_name,
+        "output": str(output_dir),
+        "assets": len(assets),
+        "components": len(components),
+        "warnings": len(manifest["warnings"]),
+        "overview": str(overview) if overview else None,
+    }
+
+
+def write_root_overview(levels: list[dict[str, Any]], output_dir: Path) -> None:
+    overview_paths = [(level["level"], Path(level["overview"])) for level in levels if level.get("overview")]
+    overview_paths = [(name, path) for name, path in overview_paths if path.exists()]
+    if not overview_paths:
+        return
+
+    thumb_w = 280
+    thumb_h = 220
+    label_h = 28
+    cols = min(2, len(overview_paths))
+    rows = math.ceil(len(overview_paths) / cols)
+    canvas = Image.new("RGBA", (cols * thumb_w, rows * (thumb_h + label_h)), (28, 30, 34, 255))
+    draw = ImageDraw.Draw(canvas)
+    for idx, (level_name, path) in enumerate(overview_paths):
+        x = (idx % cols) * thumb_w
+        y = (idx // cols) * (thumb_h + label_h)
+        with Image.open(path).convert("RGBA") as image:
+            image.thumbnail((thumb_w - 16, thumb_h - 16), Image.Resampling.LANCZOS)
+            canvas.alpha_composite(image, (x + (thumb_w - image.width) // 2, y + (thumb_h - image.height) // 2))
+        draw.text((x + 8, y + thumb_h + 4), level_name, fill=(238, 240, 244, 255))
+    canvas.save(output_dir / "overview.png")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path, help="Folder containing generated PNG UI assets.")
     parser.add_argument("--output", required=True, type=Path, help="Output folder for packaged assets.")
-    parser.add_argument("--pack-name", default="generated-ui", help="Slug used for manifests and engine folders.")
+    parser.add_argument("--pack-name", default="generated-ui", help="Slug used for output and engine folders.")
     parser.add_argument("--engines", default="godot", help="Comma list: godot,unity,cocos,generic or all. Defaults to godot.")
+    parser.add_argument("--asset-subdir", default="png", help="PNG folder name inside each level. Defaults to png.")
+    parser.add_argument("--write-manifest", action="store_true", help="Write ui-asset-manifest.json for debugging. Off by default.")
     parser.add_argument("--project", type=Path, help="Optional game project root to receive generated files.")
     parser.add_argument(
         "--godot-res-prefix",
@@ -665,26 +770,26 @@ def main(argv: list[str] | None = None) -> int:
 
     if not input_dir.is_dir():
         raise SystemExit(f"Input directory does not exist: {input_dir}")
-    pngs = sorted(input_dir.glob("*.png"))
-    if not pngs:
-        raise SystemExit(f"No PNG files found in {input_dir}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    assets = [detect_asset(path) for path in pngs]
-    unique_output_names(assets)
-    copy_assets(assets, output_dir)
-    write_preview(assets, output_dir)
-    components = build_components(assets)
-    manifest = write_manifest(pack_name, assets, components, output_dir, engines)
-
-    if "godot" in engines:
-        res_prefix = args.godot_res_prefix or f"res://assets/generated_ui/{pack_name}"
-        write_godot_outputs(manifest, output_dir, res_prefix)
-    if "unity" in engines:
-        unity_root = args.unity_root or f"Assets/GeneratedUI/{pack_name}"
-        write_unity_outputs(manifest, output_dir, unity_root)
-    if "cocos" in engines:
-        write_cocos_outputs(manifest, output_dir)
+    levels = discover_levels(input_dir)
+    level_summaries: list[dict[str, Any]] = []
+    for level_name, _level_dir, pngs in levels:
+        level_output = output_dir / level_name
+        level_summaries.append(
+            package_level(
+                level_name=level_name,
+                pngs=pngs,
+                output_dir=level_output,
+                pack_name=pack_name,
+                engines=engines,
+                asset_subdir=args.asset_subdir,
+                write_manifest_file=args.write_manifest,
+                godot_res_prefix=args.godot_res_prefix,
+                unity_root=args.unity_root,
+            )
+        )
+    write_root_overview(level_summaries, output_dir)
 
     installed = []
     if args.project:
@@ -693,9 +798,10 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "pack_name": pack_name,
         "output": str(output_dir),
-        "assets": len(assets),
-        "components": len(components),
-        "warnings": len(manifest["warnings"]),
+        "levels": level_summaries,
+        "assets": sum(level["assets"] for level in level_summaries),
+        "components": sum(level["components"] for level in level_summaries),
+        "warnings": sum(level["warnings"] for level in level_summaries),
         "installed": installed,
     }
     print(json.dumps(summary, indent=2, ensure_ascii=False))

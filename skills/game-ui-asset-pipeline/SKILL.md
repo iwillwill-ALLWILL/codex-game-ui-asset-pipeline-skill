@@ -1,18 +1,18 @@
 ---
 name: game-ui-asset-pipeline
-description: Generate, extract, style-match, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored user style references, or existing PNGs. Use when Codex needs to create or integrate panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, Unity sprite import helpers, Cocos Creator UI specs, engine-neutral manifests, or a persistent style library from user-provided images/text. This skill should compose existing image generation, background removal, sprite, atlas, and editor/MCP tools instead of reimplementing them.
+description: Generate, extract, style-match, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored user style references, or existing PNGs. Use when Codex needs to create or integrate panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, Unity/Cocos outputs on request, clean level-based PNG folders, or a persistent style library from user-provided images/text. This skill should compose existing image generation, background removal, sprite, atlas, and editor/MCP tools instead of reimplementing them.
 ---
 
 # Game UI Asset Pipeline
 
-Create game UI asset packs that can be dropped into a project. This skill is a pipeline coordinator: use existing generators and engine tools for the heavy work, then use the bundled packager and style-library helper for deterministic metadata, previews, import scaffolding, and reusable user-owned style references.
+Create game UI asset packs that can be dropped into a project. This skill is a pipeline coordinator: use existing generators and engine tools for the heavy work, then use the bundled packager and style-library helper for clean level folders, overview images, Godot scaffolding, and reusable user-owned style references.
 
 ## Supported Modes
 
 - Direct generation from prompt or current reference image.
 - Direct extraction from a user-uploaded UI screenshot or atlas into reusable components.
 - Style-locked generation from references stored under `assets/style-library`.
-- Packaging existing PNG components into a clean manifest, preview, and Godot scaffolding by default. Generate Unity/Cocos outputs only when requested.
+- Packaging existing PNG components into clean level folders with PNGs, `overview.png`, and Godot scaffolding by default. Generate JSON/Unity/Cocos outputs only when requested.
 - Optional installation into a local Godot/Unity/Cocos project.
 
 ## Workflow
@@ -21,7 +21,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Components: `panel`, `button`, `progress_bar`, `icon`, `frame`, `slot`, `hud`.
    - Engine: default to `godot` unless the user names `unity`, `cocos`, or `generic`.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
-   - Component granularity: choose `composite`, `primitive`, `layered`, or `content` before cutting. If a screenshot/card can be split at multiple levels, present a short extraction plan before final slicing.
+   - Component granularity: use progressive levels from large to small. Start with the largest useful level, then produce the next finer level only when the user asks for more detail.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
@@ -67,7 +67,7 @@ python <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py \
   --force
 ```
 
-6. Package the PNGs.
+6. Package the PNGs into level folders.
 
 ```bash
 python <skill-root>/scripts/package_ui_assets.py \
@@ -77,15 +77,17 @@ python <skill-root>/scripts/package_ui_assets.py \
   --engines godot
 ```
 
+If the input folder has subfolders, each subfolder is treated as one split level and packaged separately. Default public output contains no JSON; add `--write-manifest` only for debugging.
+
 Add `--project <game-project-root>` when the game project is local and should receive generated files.
 
 7. Integrate.
-   - Godot default: use generated `.tscn` starter scenes and `ui-asset-manifest.json`; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
+   - Godot default: use generated `.tscn` starter scenes; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
    - Unity/Cocos/generic: generate only when explicitly requested to keep output focused.
 
 8. QA before reporting done.
-   - Open `preview.png` or inspect generated assets visually.
-   - Check `warnings` in `ui-asset-manifest.json`.
+   - Open the root `overview.png` and each level's `overview.png`.
+   - Keep the public output focused: `level_xxx/png`, `level_xxx/godot`, and overview images.
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
    - Verify each button has at least a normal state, each progress bar has background/fill when possible, and stretchable components have reasonable slice margins.
    - If assets are blank, cropped, noisy, text-baked by accident, or inconsistent across states, regenerate or clean them before integration.
@@ -93,7 +95,7 @@ Add `--project <game-project-root>` when the game project is local and should re
 ## Resource Navigation
 
 - Read `references/toolchain.md` when choosing between built-in image generation, ComfyUI, chroma-key cleanup, background removal, atlas packers, or MCP/editor integration.
-- Read `references/component-contract.md` when naming assets, adjusting nine-slice margins, or mapping the manifest to a specific engine.
+- Read `references/component-contract.md` when naming assets, designing split levels, adjusting nine-slice margins, or mapping PNGs to a specific engine.
 - Read `references/style-library.md` when the user asks to upload references, store style materials, keep palette/style consistent across components, extract UI from a screenshot, or generate from a stored game style.
 - Run `scripts/package_ui_assets.py --help` for deterministic packaging options.
 - Run `scripts/ingest_style_reference.py --help` for persistent style-library commands.

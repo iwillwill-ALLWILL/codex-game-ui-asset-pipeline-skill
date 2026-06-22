@@ -16,7 +16,8 @@
 - 九宫格可拉伸 UI
 - 一整套同画风 UI 组件包
 - 安全背景色选择和边缘残留清理
-- Godot 默认输出包
+- 从大到小的递进拆分
+- 分层目录输出
 
 它不是单独的生图模型。它会让当前平台里已有的识图、生图、抠图、透明背景、图集、游戏引擎接入能力一起工作，然后把结果整理成可用的游戏 UI 资产包。
 
@@ -54,7 +55,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 要求：
 1. 保留 SKILL.md 里的触发说明和工作流。
 2. 保留 references 里的工具选择、组件命名、风格库规则。
-3. 保留 scripts 里的打包、manifest、预览图、风格库入库能力。
+3. 保留 scripts 里的分层打包、overview 概览图、Godot 输出、风格库入库能力。
 4. 如果当前平台不能直接运行 Python 脚本，就把脚本能力改造成当前平台可用的工具节点或工作流。
 5. 安装后告诉我应该用什么话术调用它。
 ```
@@ -66,7 +67,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 识图 | 分析参考图里的风格、色卡、组件结构 |
 | 生图 | 根据提示词或参考图生成 UI 组件 |
 | 图片编辑/抠图 | 把截图里的 UI 扣成透明 PNG |
-| 文件读写 | 保存组件、manifest、预览图、风格库 |
+| 文件读写 | 保存组件、overview 概览图、风格库 |
 | 脚本/工作流 | 批量命名、检查、打包、输出引擎文件 |
 
 如果平台只有聊天能力，没有识图、生图/图片处理、文件处理能力，就不要把它包装成“可直接产出 UI 组件”的 Skill。
@@ -104,9 +105,8 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 
 完成后给我：
 - 所有组件 PNG
-- preview.png
-- ui-asset-manifest.json
-- Godot 可用的导入说明或脚手架
+- overview.png
+- Godot 可用文件
 ```
 
 ### 2. 从用户上传的 UI 截图里直接扣组件
@@ -118,7 +118,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 ```text
 使用 $game-ui-asset-pipeline，从我上传的 UI 截图里扣出可复用组件。
 
-先给出组件粒度方案，再开始裁切。
+先给出从大到小的拆分阶梯，再开始裁切。
 
 目标组件：
 - 任务面板
@@ -131,23 +131,25 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 要求：
 1. 尽量使用截图里的真实 UI 元素。
 2. 去掉不需要的文字，只保留背景框、按钮框、图标和装饰。
-3. 如果一个对象可以分成多层，默认只输出“整体组件 + 游戏里会复用的基础组件”，不要把所有内层都拆出来。
-4. 每个组件单独输出透明 PNG。
-5. 裁切后加透明边距，不要贴边。
-6. 检查并清理背景残留和粉色、绿色、蓝色边缘颗粒。
-7. 最后打包成 Godot 默认可用的 UI 组件包。
+3. 先输出最大粒度的一层给我看；如果我觉得还要更细，再继续拆下一层。
+4. 每一层单独一个文件夹。
+5. 每个组件单独输出透明 PNG。
+6. 裁切后加透明边距，不要贴边。
+7. 检查并清理背景残留和粉色、绿色、蓝色边缘颗粒。
+8. 最后打包成 Godot 默认可用的 UI 组件包。
 ```
 
-组件粒度可以这样理解：
+拆分阶梯按从大到小理解：
 
-| 粒度 | 什么时候用 | 例子 |
+| 层级 | 作用 | 例子 |
 |---|---|---|
-| 整体组件 | 直接作为一个完整 UI 使用 | 整张卡牌、完整任务面板 |
-| 基础组件 | 游戏里需要复用或交互 | 按钮、进度条底/填充、面板背景、slot |
-| 分层组件 | 需要换皮、动画、运行时组合 | 卡牌外框、内参考线、背景、稀有度角标 |
-| 内容组件 | 内部内容会替换 | icon、人物立绘、徽章、插画 |
+| `level_01_complete` | 完整对象不变，只做清理和透明化 | 完整卡牌、完整任务面板 |
+| `level_02_structured` | 外框 + 内部分割线 + 内部装饰 | 卡牌框架带装饰 |
+| `level_03_layout` | 外框 + 内部分割线 | 卡牌框架和参考线 |
+| `level_04_outer_frame` | 只保留外轮廓 | 卡牌外框 |
+| `level_05_atomic` | 彻底拆成独立小层 | 外框、分割线、装饰、背景、icon、人物立绘 |
 
-默认不要全拆。全拆会让输出很乱，也不一定更好用。
+默认先交 `level_01_complete`。用户说“再细一点”，再交下一层。用户说“拆彻底”，就一直拆到 `level_05_atomic`。
 
 ### 3. 把用户上传的资料沉淀成长期风格库
 
@@ -164,7 +166,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 1. 只保存我这次明确要求沉淀的资料。
 2. 从参考图里提取色卡。
 3. 总结这个风格的线条、材质、边框、角标、发光、图标规则。
-4. 生成 style-card.md 和 palette.json。
+4. 生成风格卡和色卡资料，作为后续生成时的内部参考。
 5. 后续生成新 UI 时，必须优先读取这个风格库。
 ```
 
@@ -198,7 +200,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 3. 如果是整张 atlas，先清理 atlas，再切组件。
 4. 使用 soft matte、despill、边缘收缩和轻微羽化。
 5. 清理后重新打包。
-6. 检查 manifest，不要再出现 possible chroma-key residue warning。
+6. 检查 overview.png 和 PNG 边缘，不要再有背景残留或 key color 颗粒。
 ```
 
 ### 5. 把已有 PNG 打包成游戏 UI 组件包
@@ -214,9 +216,10 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 1. 自动识别 panel、button、progress_bar、icon、slot。
 2. 自动识别按钮状态 normal、hover、pressed、disabled。
 3. 自动识别进度条 background 和 fill。
-4. 生成 preview.png 和 ui-asset-manifest.json。
-5. 默认只生成 Godot 导入结果或使用说明。
-6. 如果 manifest 有 warnings，先解释并修复能修复的问题。
+4. 每个层级单独一个文件夹。
+5. 每个层级只保留 `png/`、`godot/`、`overview.png`。
+6. 根目录保留一个总 `overview.png`。
+7. 默认不要输出 JSON、debug 文件夹、中间裁剪图、三套引擎文件。
 ```
 
 ## 产出物是什么
@@ -225,13 +228,13 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 
 | 产出 | 作用 |
 |---|---|
-| 组件 PNG | 游戏里真正使用的 UI 图片 |
-| `preview.png` | 快速检查所有组件是否正常 |
-| `ui-asset-manifest.json` | 记录组件类型、尺寸、状态、九宫格建议、警告 |
-| Godot `.tscn` | 默认生成的 Godot 起步场景 |
-| Unity / Cocos 文件 | 只有明确要求时才生成 |
-| `style-card.md` | 长期风格库说明 |
-| `palette.json` | 从参考图提取的色卡 |
+| `overview.png` | 总览所有层级 |
+| `level_01_complete/png/` | 最大粒度 PNG |
+| `level_01_complete/godot/` | 这一层的 Godot 文件 |
+| `level_02_structured/png/` | 更细一层的 PNG |
+| `level_xxx/overview.png` | 每一层自己的概览图 |
+
+组件包默认不输出 JSON、debug 文件夹、中间裁剪图或三套引擎文件。风格库内部可以维护色卡和风格卡，但不要混进组件交付目录。
 
 ## 这个 Skill 主要解决什么问题
 
@@ -240,9 +243,9 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 每次生图都像不同游戏 | 用风格库锁定色卡、材质、线条和边框规则 |
 | 截图好看但不能直接进游戏 | 把截图拆成独立透明组件 |
 | UI 图片有背景残留或粉色边缘颗粒 | 先选择安全 key color，再用 chroma-key 清理流程处理边缘污染 |
-| 按钮、进度条、面板命名混乱 | 自动整理成组件 manifest |
+| 按钮、进度条、面板命名混乱 | 按层级和组件名称整理 PNG |
 | 素材给到引擎还要重新配置 | 默认输出 Godot 起步导入结构 |
-| 不知道该切多细 | 先确定整体、基础、分层、内容四种组件粒度 |
+| 不知道该切多细 | 按 `level_01` 到 `level_05` 从大到小逐层拆 |
 | 课程或团队想复用同一画风 | 把用户主动上传的资料沉淀进本地风格库 |
 
 ## 使用时要告诉 AI 的关键信息
@@ -253,7 +256,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 我要做什么游戏画风？
 我上传的图是参考风格，还是要直接扣组件？
 我要哪些组件？
-这些组件要按整体切，还是要分层切？
+先交最大粒度，还是直接拆彻底？
 要不要按钮状态？
 要不要进度条 background / fill？
 目标引擎是否就是默认 Godot？
