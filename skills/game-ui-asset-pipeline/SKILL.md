@@ -21,7 +21,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Components: `panel`, `button`, `progress_bar`, `icon`, `frame`, `slot`, `hud`.
    - Engine: default to `godot` unless the user names `unity`, `cocos`, or `generic`.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
-   - Component granularity: use progressive levels from large to small. Start with the largest useful level, then produce the next finer level only when the user asks for more detail.
+   - Component granularity: use progressive levels from large to small and output all useful levels by default. Only limit the output when the user explicitly asks for one layer or a narrow subset.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
@@ -106,6 +106,6 @@ Add `--project <game-project-root>` when the game project is local and should re
 - Do not generate creative UI art with Python, SVG, Canvas, CSS, or procedural placeholders. Scripts may only inspect, copy, preview, and package already-created raster assets.
 - Do not hand-roll a diffusion backend, background remover, atlas packer, or engine editor bridge when a usable project tool exists.
 - Do not treat a full UI mockup screenshot as a finished component pack. Extract or regenerate components separately so buttons, panels, and bars remain reusable.
-- Do not explode every visible sub-layer into separate files by default. Use the agreed component granularity and keep the default output small.
+- Do output every meaningful split level by default, from complete object down to atomic layers, but keep each level in its own folder so the result stays usable.
 - Do not silently persist user images/text. Store them in the style library only when the user explicitly asks for long-term reuse or skill memory.
 - Keep unrelated game implementation changes out of scope unless the user explicitly asks to wire the new UI into gameplay.

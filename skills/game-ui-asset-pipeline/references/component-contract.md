@@ -28,14 +28,14 @@ The packager auto-detects common synonyms, but explicit names reduce correction 
 
 ## Progressive Split Levels
 
-When the user says "cut UI components", split from large to small. Do not start by extracting every tiny layer.
+When the user says "cut UI components", split from large to small. Output every meaningful level by default, but keep each level in a separate folder.
 
 Default behavior:
 
-1. Produce the largest useful layer first.
-2. Show the level overview to the user.
-3. If the user asks for smaller granularity, produce the next level.
-4. Continue downward until the object is decomposed as thoroughly as the user needs.
+1. Produce all progressive levels in one pass unless the user narrows the scope.
+2. Keep complete, structured, layout, frame-only, and atomic outputs separate.
+3. Make the final atomic level as complete as possible for recomposition.
+4. Use the root `overview.png` and each level `overview.png` to help the user compare granularity.
 
 Use this level naming:
 
@@ -74,10 +74,10 @@ Extraction ladder:
 - level_04_outer_frame: outer frame only
 - level_05_atomic: frame, dividers, decorations, background, icon, portrait as separate PNGs
 
-Start with level_01_complete. Wait for user feedback before producing smaller levels.
+Produce all listed levels by default. If the user asks for only one layer, output only that folder.
 ```
 
-If the user explicitly asks to "拆彻底", produce every level down to `level_05_atomic`.
+If the user explicitly asks to "拆彻底", verify that `level_05_atomic` contains every separable useful part, including frame, divider lines, ornaments, background, icons, portraits, badges, and glows when present.
 
 ## Nine-Slice Defaults
 

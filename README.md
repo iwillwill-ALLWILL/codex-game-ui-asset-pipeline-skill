@@ -131,7 +131,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 要求：
 1. 尽量使用截图里的真实 UI 元素。
 2. 去掉不需要的文字，只保留背景框、按钮框、图标和装饰。
-3. 先输出最大粒度的一层给我看；如果我觉得还要更细，再继续拆下一层。
+3. 默认一次输出所有拆分层级，从最大粒度一直拆到最细可用层级。
 4. 每一层单独一个文件夹。
 5. 每个组件单独输出透明 PNG。
 6. 裁切后加透明边距，不要贴边。
@@ -149,7 +149,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | `level_04_outer_frame` | 只保留外轮廓 | 卡牌外框 |
 | `level_05_atomic` | 彻底拆成独立小层 | 外框、分割线、装饰、背景、icon、人物立绘 |
 
-默认先交 `level_01_complete`。用户说“再细一点”，再交下一层。用户说“拆彻底”，就一直拆到 `level_05_atomic`。
+默认把这些层级都输出出来。不同粒度层级必须单独放文件夹；如果用户只要某一层，再按用户要求缩小范围。
 
 ### 3. 把用户上传的资料沉淀成长期风格库
 
@@ -256,7 +256,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 我要做什么游戏画风？
 我上传的图是参考风格，还是要直接扣组件？
 我要哪些组件？
-先交最大粒度，还是直接拆彻底？
+是否只要某一层？如果没有特别说明，默认输出全部层级。
 要不要按钮状态？
 要不要进度条 background / fill？
 目标引擎是否就是默认 Godot？

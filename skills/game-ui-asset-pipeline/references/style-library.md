@@ -50,7 +50,7 @@ Use this when the user wants the UI elements already present in a screenshot/ref
 
 1. Inspect the source image and list target components: panels, buttons, progress bars, icons, map nodes, slots, frames, tabs.
 2. If the user requested long-term reuse, ingest the source image into a style entry before extraction.
-3. Decide the progressive split ladder before cutting. Start with `level_01_complete`; add smaller levels only when the user asks, unless they explicitly request a full deep split.
+3. Decide the progressive split ladder before cutting. Output every useful level by default, from `level_01_complete` down to the most atomic useful layer.
 4. Crop or segment components from the source. Use existing tools first:
    - flat key/background: use the installed `imagegen` chroma-key cleanup helper
    - complex background: use `rembg`, BiRefNet, Segment Anything, or a local editor workflow if available
