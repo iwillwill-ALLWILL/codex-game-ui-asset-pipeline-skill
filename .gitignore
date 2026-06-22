@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.idea/
+.vscode/
+.venv/
+venv/
+dist/
+build/
+
+# User-uploaded style references are private by default.
+skills/game-ui-asset-pipeline/assets/style-library/*
+!skills/game-ui-asset-pipeline/assets/style-library/.gitkeep
+
+# Generated UI packs should stay out of the skill repository.
+outputs/
+generated/
+tmp/
+temp/
