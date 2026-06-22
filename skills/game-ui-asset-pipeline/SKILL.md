@@ -9,8 +9,8 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 
 ## Supported Modes
 
-- Project style-library driven generation from references stored under `assets/style-library`.
-- Full common UI kit generation from the bundled component catalog.
+- Project style-library driven generation from curated references stored under `assets/style-library`.
+- Full common UI kit generation from the bundled, source-grounded component catalog.
 - Direct generation from prompt or current reference image.
 - Direct extraction from a user-uploaded UI screenshot or atlas into reusable components when the user wants visible elements from that exact image.
 - Packaging existing PNG components into clean level folders with PNGs, `overview.png`, and Godot scaffolding by default. Generate JSON/Unity/Cocos outputs only when requested.
@@ -28,9 +28,10 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
    - Only store images/text the user explicitly provided and asked to reuse, remember, add to the skill, or "沉淀".
    - Treat the style library as project memory, not a single static prompt. It can contain reference images, text notes, reference prompts, accepted generated outputs, rejected-output lessons, palette data, and manual style rules.
+   - When many files are uploaded, curate before ingesting: classify each useful input as `anchor`, `accepted-output`, `support`, `prompt`, `rejected`, or `noise`; keep only the strongest positive references in the style lock and turn noise/rejections into avoid-list lessons.
    - Run `scripts/ingest_style_reference.py ingest` to copy the files, extract a palette, store reference prompts, and create/update a style card.
    - For future style-matched generation, run `scripts/ingest_style_reference.py list` or `show`, then inspect the stored reference images before prompting the image backend.
-   - Let the library self-organize over time: update tags, palette roles, prompt bank, avoid-list, component naming habits, and accepted generation anchors when the user approves or rejects outputs.
+   - Let the library self-organize over time: update tags, palette roles, prompt bank, avoid-list, component naming habits, accepted generation anchors, and source weights when the user approves or rejects outputs.
 
 3. Reuse the right tool.
    - For raw raster art, use built-in `image_gen`, a local ComfyUI workflow, or the project's configured image backend.
@@ -41,7 +42,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
 
 4. Generate or extract component art as isolated assets.
    - Prefer one PNG per component or state: `panel_inventory.png`, `button_play_normal.png`, `button_play_hover.png`, `button_play_pressed.png`, `progress_health_bg.png`, `progress_health_fill.png`.
-   - For a full UI kit or "常用 UI" request, read `references/ui-component-catalog.md`, choose the `complete` or project-specific checklist, and generate in category batches when needed.
+   - For a full UI kit or "常用 UI" request, read `references/ui-component-catalog.md`, choose the `complete` or project-specific checklist, map every item to a known control/game UI archetype, and generate in category batches when needed.
    - Avoid baked UI text unless explicitly requested; labels are usually engine text nodes.
    - Ask for clean orthographic UI art, no mockup screen, no perspective scene, no watermark, no drop shadow that crosses the canvas edge.
    - Prefer native transparent output. If a flat removable background is required, do not default blindly to `#FF00FF`; choose a key color that is absent from the reference/style palette.

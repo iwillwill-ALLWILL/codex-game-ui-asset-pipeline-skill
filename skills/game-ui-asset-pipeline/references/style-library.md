@@ -15,6 +15,30 @@ Use this reference when the user asks to upload UI references, store a long-term
 
 Only persist references when the user explicitly asks to store, remember, reuse long-term, add to the skill, or "沉淀" the uploaded material. Do not silently store arbitrary images from a one-off generation request.
 
+## Curate Large Uploads Before Ingesting
+
+When the user uploads many documents, screenshots, prompts, or reference images, do not blindly add every file as equal evidence. First distill the material into a compact style memory that preserves the most useful signal and discards noise.
+
+Use these roles:
+
+| Role | Meaning | Default style weight | How to use |
+|---|---|---:|---|
+| `anchor` | highest-confidence visual reference for the target game style | `1.0` | palette, material, linework, corners, icons, and prompt lock |
+| `accepted-output` | generated result the user approved | `0.9` | stronger future generation anchor than loose inspiration |
+| `support` | useful secondary reference | `0.5` | helps confirm recurring traits but should not overrule anchors |
+| `prompt` | text prompt/reference wording | `0.3` | informs phrasing, not visual palette by itself |
+| `rejected` | failed output or off-style reference with a known reason | `0.0` | contributes only to avoid-list |
+| `noise` | irrelevant, inconsistent, low-quality, or contradictory input | `0.0` | exclude from positive style lock; keep only a short rejection note if useful |
+
+Filtering rules:
+
+1. Rank inputs by user intent, visual consistency, production quality, uniqueness, recency, and whether the user explicitly approved them.
+2. Keep only the best visual anchors for the style lock. More files are not automatically better if they contradict the desired palette or material language.
+3. Summarize long documents into short style facts: palette roles, materials, UI shapes, icons, forbidden motifs, and component requirements. Do not use whole documents as generation context unless a specific passage matters.
+4. Convert repeated visual facts into `style-card.md`; convert successful prompts into `reference-prompts.md`; convert failures into the avoid-list.
+5. Do not let rejected/noise files affect palette extraction or positive style prompts.
+6. When two references conflict, prefer the explicit user requirement, then approved accepted outputs, then anchor images, then support references, then broad docs.
+
 ## Project Style Library Model
 
 Treat each style entry as a living project-level memory. It should become more useful as the user uploads more references and accepts or rejects generated outputs.
@@ -34,7 +58,8 @@ Self-organization rules:
 3. Convert accepted outputs into stronger generation anchors when the user says the result is good.
 4. Convert rejected outputs into avoid-list notes: what drifted, which colors failed, which shapes were off-style, or which components were unusable.
 5. Keep prompt examples separate from visual notes. Prompts explain generation intent; style cards explain visual rules.
-6. For every future generation, read the style card, palette, prompt bank, and at least the most relevant reference images before prompting the image backend.
+6. Preserve a stable style precedence: explicit user requirement > style card > accepted outputs > anchor images > support references > prompt bank > broad docs. Rejected/noise entries are negative evidence only.
+7. For every future generation, read the style card, palette, prompt bank, avoid-list, and the most relevant anchor/accepted reference images before prompting the image backend.
 
 ## Ingest Uploaded References
 
@@ -47,8 +72,12 @@ python <skill-root>/scripts/ingest_style_reference.py ingest \
   --input <uploaded-image-or-folder> \
   --notes "<user notes or visual summary>" \
   --prompt "<reference or successful generation prompt>" \
+  --role anchor \
+  --weight 1.0 \
   --tag <tag>
 ```
+
+Use `--role accepted-output` when the user approves a generated sheet. Use `--role rejected --avoid "<failure reason>"` for failed results. Use `--role noise --avoid "<why excluded>"` only when recording a lesson is useful; otherwise do not ingest noise at all.
 
 Then inspect the images and, when useful, edit the generated `style-card.md` manual notes with concise facts:
 
@@ -73,12 +102,12 @@ python <skill-root>/scripts/ingest_style_reference.py show --style <style-slug>
 Use this when the user wants production-ready components in the same style as materials previously stored in the skill. Prefer this over concept screenshot extraction for buttons, panels, bars, cards, slots, and repeatable HUD parts.
 
 1. Run `list` or `show` to locate the style. Read the style card and inspect stored reference images.
-2. Build a compact style lock for prompts:
+2. Build a compact style lock from positive references only:
    - exact palette hex colors from `palette.json`
    - material and linework notes from `style-card.md`
    - useful prompt phrasing from `reference-prompts.md`
    - component shape rules from the reference image
-   - explicit negative prompt for text, mockup screens, perspective scenes, and off-palette colors
+   - explicit negative prompt from the avoid-list plus text, mockup screens, perspective scenes, and off-palette colors
 3. If the user asks for a complete/common UI kit, read `ui-component-catalog.md` and choose the complete or project-specific checklist.
 4. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
 5. Generate related components in category batches when a single huge atlas would reduce quality. Keep the same style lock, key color, naming scheme, and output categories across every batch.

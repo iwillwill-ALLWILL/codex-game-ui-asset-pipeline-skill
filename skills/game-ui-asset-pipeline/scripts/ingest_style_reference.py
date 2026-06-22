@@ -35,6 +35,16 @@ KEY_COLORS = {
     (0, 255, 0),
     (0, 0, 255),
 }
+CURATION_ROLES = ("anchor", "support", "prompt", "accepted-output", "rejected", "noise")
+DEFAULT_ROLE_WEIGHTS = {
+    "anchor": 1.0,
+    "accepted-output": 0.9,
+    "support": 0.5,
+    "prompt": 0.3,
+    "rejected": 0.0,
+    "noise": 0.0,
+}
+POSITIVE_STYLE_ROLES = {"anchor", "accepted-output", "support"}
 
 
 def now_iso() -> str:
@@ -203,6 +213,28 @@ def read_prompts(args: argparse.Namespace) -> list[str]:
     return prompts
 
 
+def read_avoid_items(args: argparse.Namespace, notes: str) -> list[str]:
+    items = [(item or "").strip() for item in args.avoid or []]
+    if args.role in {"rejected", "noise"} and notes.strip():
+        items.append(notes.strip())
+    return [item for item in items if item]
+
+
+def resolved_role_weight(role: str, explicit_weight: float | None) -> float:
+    if explicit_weight is None:
+        return DEFAULT_ROLE_WEIGHTS.get(role, 0.5)
+    return max(0.0, min(1.0, explicit_weight))
+
+
+def positive_style_record(record: dict[str, Any]) -> bool:
+    role = record.get("role", "support")
+    try:
+        weight = float(record.get("style_weight", DEFAULT_ROLE_WEIGHTS.get(role, 0.5)))
+    except (TypeError, ValueError):
+        weight = 0.0
+    return role in POSITIVE_STYLE_ROLES and weight > 0
+
+
 def text_excerpt(path: Path, max_chars: int = 2400) -> str:
     if file_kind(path) != "text":
         return ""
@@ -223,6 +255,7 @@ def write_style_card(
     notes: str,
     prompts: list[dict[str, Any]],
     text_notes: list[dict[str, str]],
+    avoid_list: list[str],
 ) -> None:
     path = style_dir / "style-card.md"
     manual_notes = ""
@@ -237,10 +270,23 @@ def write_style_card(
         f"- `{color['hex']}` ratio `{color['ratio']}`"
         for color in colors[:12]
     ] or ["- No image palette extracted."]
-    file_lines = [
-        f"- `{item['path']}` ({item['kind']}, sha256 `{item['sha256'][:12]}`)"
-        for item in entry.get("files", [])
-    ] or ["- No stored files."]
+    grouped_files: dict[str, list[str]] = {role: [] for role in CURATION_ROLES}
+    for item in entry.get("files", []):
+        role = item.get("role", "support")
+        if role not in grouped_files:
+            grouped_files[role] = []
+        weight = item.get("style_weight", DEFAULT_ROLE_WEIGHTS.get(role, 0.5))
+        grouped_files[role].append(
+            f"- `{item['path']}` ({item['kind']}, role `{role}`, weight `{weight}`, sha256 `{item['sha256'][:12]}`)"
+        )
+    file_sections: list[str] = []
+    for role in CURATION_ROLES:
+        lines = grouped_files.get(role, [])
+        if not lines:
+            continue
+        file_sections.append(f"### {role}\n\n" + "\n".join(lines))
+    file_lines = "\n\n".join(file_sections) if file_sections else "No stored files."
+    avoid_lines = [f"- {item}" for item in avoid_list] or ["- No avoid-list items recorded."]
     text_lines: list[str] = []
     for item in text_notes:
         text_lines.append(f"### {item['name']}\n\n```text\n{item['excerpt']}\n```")
@@ -262,11 +308,19 @@ Tags: `{', '.join(entry.get('tags', [])) or 'none'}`
 
 ## Stored References
 
-{chr(10).join(file_lines)}
+{file_lines}
+
+## Style Lock Precedence
+
+Positive style evidence order: explicit user requirement > this style card > accepted outputs > anchor references > support references > prompt bank > broad docs. Rejected and noise entries are negative evidence only and must not affect palette extraction or positive style prompts.
 
 ## Extracted Palette
 
 {chr(10).join(palette_lines)}
+
+## Avoid List
+
+{chr(10).join(avoid_lines)}
 
 ## Text Reference Excerpts
 
@@ -287,6 +341,7 @@ When this style is selected, inspect the stored reference images before generati
 - Keep a stable style lock: palette roles, line weight, material language, corner shapes, icon rules, button states, and avoid-list.
 - When a generated result is accepted by the user, store its prompt or final component sheet as a stronger reference for future batches.
 - When a generated result is rejected, add the failure reason to the avoid-list instead of deleting useful references.
+- Do not let rejected/noise entries influence palette or positive prompt construction.
 
 ## Manual Style Notes
 
@@ -335,7 +390,9 @@ def ingest(args: argparse.Namespace) -> int:
     library_dir = root / "assets" / "style-library"
     style_slug = slugify(args.style)
     style_dir = library_dir / style_slug
-    sources_dir = style_dir / "sources"
+    role = args.role
+    style_weight = resolved_role_weight(role, args.weight)
+    sources_dir = style_dir / ("rejections" if role in {"rejected", "noise"} else "sources")
     sources_dir.mkdir(parents=True, exist_ok=True)
 
     now = now_iso()
@@ -364,6 +421,8 @@ def ingest(args: argparse.Namespace) -> int:
             "sha256": digest,
             "bytes": source.stat().st_size,
             "added_at": now,
+            "role": role,
+            "style_weight": style_weight,
         }
         files.append(record)
         existing_hashes.add(digest)
@@ -375,6 +434,8 @@ def ingest(args: argparse.Namespace) -> int:
     aggregate_pixels: list[tuple[int, int, int]] = []
     for record in files:
         if record.get("kind") != "image":
+            continue
+        if not positive_style_record(record):
             continue
         image_path = root / record["path"]
         pixels, size = sample_visible_pixels(image_path)
@@ -406,9 +467,20 @@ def ingest(args: argparse.Namespace) -> int:
 
     notes = read_notes(args)
     new_prompts = read_prompts(args)
+    new_avoid_items = read_avoid_items(args, notes)
     previous_notes = entry.get("notes", "")
     merged_notes = notes or previous_notes
+    avoid_list = list(entry.get("avoid_list", []))
+    existing_avoid = set(avoid_list)
+    for item in new_avoid_items:
+        if item not in existing_avoid:
+            avoid_list.append(item)
+            existing_avoid.add(item)
     tags = sorted(set(entry.get("tags", [])) | {slugify(tag) for tag in args.tag})
+    role_counts: dict[str, int] = {}
+    for item in files:
+        item_role = item.get("role", "support")
+        role_counts[item_role] = role_counts.get(item_role, 0) + 1
     entry = {
         "slug": style_slug,
         "title": args.title or entry.get("title") or args.style,
@@ -416,10 +488,12 @@ def ingest(args: argparse.Namespace) -> int:
         "updated_at": now,
         "tags": tags,
         "notes": merged_notes,
+        "avoid_list": avoid_list,
         "path": rel(style_dir, root),
         "style_card": rel(style_dir / "style-card.md", root),
         "palette_file": rel(style_dir / "palette.json", root),
         "files": files,
+        "role_counts": role_counts,
         "image_count": sum(1 for item in files if item.get("kind") == "image"),
         "text_count": sum(1 for item in files if item.get("kind") == "text"),
         "document_count": sum(1 for item in files if item.get("kind") == "document"),
@@ -430,16 +504,19 @@ def ingest(args: argparse.Namespace) -> int:
     entry["prompt_bank"] = rel(style_dir / "reference-prompts.md", root)
     styles[style_slug] = entry
     save_json(index_path(root), idx)
-    write_style_card(root, style_dir, entry, palette, merged_notes, prompts, text_notes)
+    write_style_card(root, style_dir, entry, palette, merged_notes, prompts, text_notes, avoid_list)
 
     print(
         json.dumps(
             {
                 "style": style_slug,
+                "role": role,
+                "style_weight": style_weight,
                 "copied": copied,
                 "files": len(files),
                 "image_count": entry["image_count"],
                 "prompt_count": entry["prompt_count"],
+                "avoid_count": len(avoid_list),
                 "palette_colors": len(entry["palette"]),
                 "style_card": str(style_dir / "style-card.md"),
             },
@@ -455,7 +532,8 @@ def list_styles(args: argparse.Namespace) -> int:
     idx = load_index(root)
     for slug, entry in sorted(idx.get("styles", {}).items()):
         tags = ", ".join(entry.get("tags", []))
-        print(f"{slug}\t{entry.get('title', slug)}\timages={entry.get('image_count', 0)}\ttags={tags}")
+        role_counts = ", ".join(f"{role}:{count}" for role, count in sorted(entry.get("role_counts", {}).items()))
+        print(f"{slug}\t{entry.get('title', slug)}\timages={entry.get('image_count', 0)}\troles={role_counts or 'none'}\ttags={tags}")
     return 0
 
 
@@ -477,7 +555,14 @@ def show_style(args: argparse.Namespace) -> int:
     print(f"palette: {colors}")
     print("references:")
     for item in entry.get("files", []):
-        print(f"- {root / item['path']}")
+        role = item.get("role", "support")
+        weight = item.get("style_weight", DEFAULT_ROLE_WEIGHTS.get(role, 0.5))
+        print(f"- {root / item['path']} role={role} weight={weight}")
+    avoid_list = entry.get("avoid_list", [])
+    if avoid_list:
+        print("avoid_list:")
+        for item in avoid_list:
+            print(f"- {item}")
     return 0
 
 
@@ -494,6 +579,9 @@ def build_parser() -> argparse.ArgumentParser:
     ingest_parser.add_argument("--notes-file", type=Path, help="Text/Markdown notes file to store with this style.")
     ingest_parser.add_argument("--prompt", action="append", help="User-provided reference prompt to store with this style. Repeatable.")
     ingest_parser.add_argument("--prompt-file", action="append", type=Path, help="Text/Markdown prompt file to store with this style. Repeatable.")
+    ingest_parser.add_argument("--role", choices=CURATION_ROLES, default="support", help="Curated role for these inputs. Rejected/noise items do not affect palette extraction.")
+    ingest_parser.add_argument("--weight", type=float, help="Optional style influence weight from 0.0 to 1.0. Defaults depend on --role.")
+    ingest_parser.add_argument("--avoid", action="append", help="Avoid-list lesson to store with this style. Repeatable.")
     ingest_parser.add_argument("--tag", action="append", default=[], help="Search tag. Repeatable.")
     ingest_parser.set_defaults(func=ingest)
 

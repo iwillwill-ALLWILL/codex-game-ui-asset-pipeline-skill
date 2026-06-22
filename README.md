@@ -31,6 +31,21 @@
 
 概念图拆分仍然支持，但它更适合快速试拆、复用截图里已经清晰可见的元素、或做风格分析。概念图不是源文件分层，边框和背景粘在一起时，不可能保证每个边缘都像 PSD/Figma 那样完整干净。
 
+内置“常用 UI 组件清单”不是凭空列出来的。它综合了成熟 UI/control 体系和游戏资产分类：Godot 控件、Unity UI Toolkit、Cocos Creator UI 组件、Dear ImGui 常见控件、Material Design 组件分类、Kenney UI 包、Game-icons.net、OpenGameArt UI 资源分类。它们用来帮助 AI 明白“这个东西本来就是一个现成 UI 组件/控件原型”，比如按钮、进度条、九宫格面板、列表、树、下拉、标签页、卡牌、背包格子、HUD、地图节点、状态图标等。
+
+参考来源：
+
+| 来源 | 主要借鉴什么 |
+|---|---|
+| [Godot Control / UI 节点](https://docs.godotengine.org/en/stable/classes/class_control.html) | Godot 默认目标引擎的控件基类和控件思路 |
+| [Unity UI Toolkit controls](https://docs.unity3d.com/Manual/UIElements.html) | 通用控件族、列表、树、选择器、按钮等 |
+| [Cocos Creator UI 组件](https://docs.cocos.com/creator/manual/en/ui-system/components/editor/button.html) | 游戏引擎里的按钮、滑条、进度条、滚动视图等控件 |
+| [Dear ImGui](https://github.com/ocornut/imgui) | 成熟游戏工具 UI 的按钮、滑条、树、表、菜单、弹窗等控件形态 |
+| [Material Design Components](https://m3.material.io/components) | 通用 UI 组件分类和交互状态 |
+| [Kenney UI Pack](https://kenney.nl/assets/ui-pack) | 游戏 UI 资产包常见分类、按钮、面板、图标素材结构 |
+| [Game-icons.net](https://game-icons.net/) | 游戏图标分类和常用符号覆盖面 |
+| [OpenGameArt GUI](https://opengameart.org/art-search-advanced?keys=gui) | 开源游戏 GUI 资产分类参考 |
+
 ## 安装方式
 
 ### 方式一：安装到 Codex
@@ -126,6 +141,33 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 色卡 | 控制整套 UI 的颜色一致性 |
 | 风格卡 | 固定线条、边框、按钮、图标、材质规则 |
 | 标签和索引 | 让多个项目风格库能被检索和区分 |
+
+如果你一次上传很多资料，不要让 AI 全部等权重学习。应该让它先筛选：
+
+| 资料角色 | 什么时候用 | 对风格影响 |
+|---|---|---|
+| `anchor` | 最像目标游戏的核心参考图 | 最高，决定色卡、线条、材质、边框 |
+| `accepted-output` | 用户已经确认效果好的生成结果 | 很高，作为后续批量生成的成功样板 |
+| `support` | 有帮助但不是核心的辅助参考 | 中等，只补充稳定共性 |
+| `prompt` | 参考提示词、成功提示词、风格说明 | 主要影响描述方式 |
+| `rejected` | 失败结果或跑偏样例 | 不参与正向学习，只进入避坑规则 |
+| `noise` | 不相关、低质量、风格冲突资料 | 丢弃或只记录“为什么不要” |
+
+可直接复制这段：
+
+```text
+使用 $game-ui-asset-pipeline，把我上传的大量资料整理成 <风格名> 项目风格库。
+
+要求：
+1. 不要全部等权重入库，先筛掉噪音。
+2. 把最契合目标风格的参考图标成 anchor。
+3. 把我确认过效果好的生成结果标成 accepted-output。
+4. 把普通辅助参考标成 support。
+5. 把参考提示词和成功提示词标成 prompt。
+6. 把失败结果和跑偏方向写进 rejected/avoid-list。
+7. 长文档只提炼会影响 UI 风格和组件生成的精华，不要整篇塞进提示词。
+8. 后续生成时，以风格卡、色卡、anchor、accepted-output 为主，rejected/noise 只作为避坑。
+```
 
 ### 2. 生成全套常用 UI 组件
 

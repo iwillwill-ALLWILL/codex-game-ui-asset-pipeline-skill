@@ -2,6 +2,52 @@
 
 Use this reference when the user asks for a full UI kit, common UI components, a complete game UI pack, or a well-organized output structure. Generate only the requested modules for narrow tasks; generate the full checklist when the user asks for "全套", "完整", "常用 UI", or "覆盖所有需求".
 
+## Source-Grounded Catalog
+
+This catalog is not a free-form brainstorm. Treat it as a synthesis of mature UI/control taxonomies:
+
+- Engine UI controls: [Godot `Control`](https://docs.godotengine.org/en/stable/classes/class_control.html) nodes such as `Button`, `TextureButton`, `ProgressBar`, `TextureProgressBar`, `NinePatchRect`, `ScrollContainer`, `TabContainer`, `OptionButton`, `ItemList`, and `Tree`.
+- Engine UI controls: [Unity UI Toolkit](https://docs.unity3d.com/Manual/UIElements.html) controls such as `Button`, `Toggle`, `Slider`, `DropdownField`, `ListView`, `TreeView`, and progress/list controls.
+- Engine UI controls: [Cocos Creator UI components](https://docs.cocos.com/creator/manual/en/ui-system/components/editor/button.html) such as `Button`, `ProgressBar`, `Slider`, `Toggle`, `ScrollView`, `ScrollBar`, `Mask`, and `EditBox`.
+- Immediate-mode/game tooling widgets: [Dear ImGui](https://github.com/ocornut/imgui) examples such as buttons, checkboxes, radio buttons, sliders, progress bars, combo/dropdown widgets, tree nodes, tabs, tables, menus, and popups.
+- General product UI components: [Material Design components](https://m3.material.io/components) for action, containment, communication, navigation, selection, and text-input patterns.
+- Game asset taxonomies: [Kenney UI packs](https://kenney.nl/assets/ui-pack), [OpenGameArt GUI packs](https://opengameart.org/art-search-advanced?keys=gui), and [Game-icons.net](https://game-icons.net/) categories for game-specific icons, buttons, panels, sliders, cards, HUD pieces, resource/status icons, and decoration atoms.
+
+Use these sources for taxonomy and naming only. Do not copy third-party art unless the user explicitly provides it and the license permits reuse.
+
+## Canonical Archetype Map
+
+Every generated item should map to a known UI/control archetype or a common game UI asset archetype. If a requested item has no clear archetype, classify it as `project-specific` and describe why it is still useful before generating it.
+
+| Catalog family | Mature archetype | Godot default | Asset parts to generate |
+|---|---|---|---|
+| panels, windows, popups, frames | panel/container/card/dialog/surface | `NinePatchRect`, `Panel`, `PanelContainer` | stretchable background, border, corners, optional decor |
+| buttons and state buttons | button/icon button/toggle/checkbox/radio | `TextureButton`, `Button`, `CheckButton`, `CheckBox` | normal, hover, pressed, disabled, selected, optional icon plate |
+| bars, meters, sliders | progress bar/meter/slider | `TextureProgressBar`, `ProgressBar`, `HSlider`, `VSlider` | track/bg, fill, caps, handle, segment states |
+| scroll and long content | scroll view/scrollbar/list container | `ScrollContainer`, `VScrollBar`, `HScrollBar`, `ItemList` | viewport frame, track, thumb, row states |
+| tabs and navigation | tabs/breadcrumb/menu/navigation rail | `TabContainer`, `TabBar`, `MenuButton` | tab selected/unselected, arrows, separators, menu panels |
+| inputs and selectors | text field/search field/dropdown/stepper | `LineEdit`, `TextEdit`, `OptionButton`, `SpinBox` | input background, focus state, dropdown panel, arrows |
+| lists, trees, rows | list row/tree item/table row | `ItemList`, `Tree`, `GridContainer` | row default/hover/selected, expand marker, cell frame |
+| cards and slots | card/item slot/equipment slot/reward tile | `NinePatchRect` plus child nodes | complete card, frame, dividers, portrait/icon area, rarity state |
+| HUD clusters | overlay/status/resource cluster | `Control` scene with child textures | frame, icon sockets, bar sockets, badges, notification shell |
+| map/progression nodes | graph node/path marker/breadcrumb | `TextureButton`, `Line2D`, `Control` | node states, path segments, current/completed/locked markers |
+| icons and badges | icon/button glyph/status symbol | `TextureRect`, `TextureButton` | transparent icon, optional badge plate, state/rarity variants |
+| decoration atoms | corner/rivet/seal/glow/material tile | `TextureRect`, shader/material input | corners, rivets, ribbons, glows, repeatable textures |
+
+## Component Generation Contract
+
+For each catalog item or batch, expand the item into this contract before prompting an image backend:
+
+- `archetype`: the known control or game UI pattern it represents.
+- `use`: where it appears in a game screen.
+- `states`: required states such as normal, hover, pressed, disabled, selected, locked, ready, cooldown, full, empty, warning.
+- `parts`: required PNG parts such as bg/track/fill/handle/frame/corner/icon/decor.
+- `engine_mapping`: default Godot node family, usually `NinePatchRect`, `TextureButton`, `TextureProgressBar`, `TextureRect`, or a `Control` scene.
+- `style_lock`: palette, linework, material, corners, icon silhouette, glow/shadow rules from the selected style library.
+- `output_folder`: category folder such as `panels`, `buttons`, `bars`, `cards`, `slots`, `hud`, `icons`, `frames`, or `images`.
+
+Do not let the image model infer that a "button" is a random decorative rectangle. State the exact archetype and required states in the prompt.
+
 ## Output Categories
 
 When packaging a full kit, keep level folders but organize PNGs by category:
