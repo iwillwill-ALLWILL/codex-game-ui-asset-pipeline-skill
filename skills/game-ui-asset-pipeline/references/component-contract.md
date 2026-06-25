@@ -124,7 +124,8 @@ Final delivered PNGs should match the intended game usage size closely enough th
 - Downscale each isolated component after alpha cleanup and before packaging. Do not downscale a whole sheet and then slice, because gutters, neighboring cells, and key-color antialiasing will contaminate the final component.
 - For transparent assets, use premultiplied-alpha resizing and zero alpha-0 RGB after resizing to avoid colored rims in thumbnails and texture filtering.
 - For nine-slice UI, preserve corner and border detail at the target cap size; use engine stretch regions for larger layout sizes instead of shipping one enormous panel and shrinking it everywhere.
-- If a resized asset looks muddy or noisy at 100 percent, regenerate closer to target size or rerun `scripts/resize_assets_high_quality.py` with light prefiltering. Do not solve muddy downscales by sharpening aggressively enough to create halos.
+- If a resized asset looks muddy or noisy at 100 percent, regenerate closer to target size or rerun `scripts/resize_assets_high_quality.py` with `--denoise auto --sampler area-lanczos`. Use OpenCV/ImageMagick/libvips when available; the portable fallback should still do area-style preshrink, alpha premultiplication, and mild final unsharp masking.
+- Do not solve muddy downscales by blur-only denoising or aggressive sharpening. Blur-only destroys borders before resizing; aggressive sharpening creates halos.
 
 ## Output Scope
 

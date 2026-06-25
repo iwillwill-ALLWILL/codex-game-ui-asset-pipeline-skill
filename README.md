@@ -123,6 +123,8 @@ python <skill-root>/scripts/resize_assets_high_quality.py \
   --input <png-or-folder> \
   --output <final-size-folder> \
   --max-side 512 \
+  --denoise auto \
+  --sampler area-lanczos \
   --prefilter 0.18
 
 # 把 PNG 打包成分类目录、overview 和 Godot 起步文件

@@ -60,8 +60,9 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Do not rely on the engine, editor, or browser to force huge generated PNGs down to final UI size. Large one-step runtime scaling can turn painterly texture, bevels, antialiasing, and small ornaments into noisy muddy pixels.
    - Prefer generating close to the intended final size, or generate a controlled 2x/3x source and downsample once during the asset pipeline.
    - Crop/trim to the true component bounds first, add transparent padding, then resize. Do not resize a large sheet with empty gutters and then slice it.
+   - Prefer mature open-source resize implementations when they are available: OpenCV `INTER_AREA` for decimation, libvips/sharp Lanczos resizing with alpha premultiplication, or ImageMagick filtered resize/unsharp chains. Use the bundled helper as the portable fallback.
    - For transparent PNGs, resize with premultiplied alpha so dark/colored transparent pixels cannot bleed into the edge.
-   - For severe reductions, use multi-step Lanczos downsampling, optional light prefiltering, and mild post-sharpening. Avoid nearest-neighbor or a single bilinear shrink for UI art.
+   - For severe reductions, use area/box pre-shrink plus Lanczos final resize, edge-aware flat-area denoise, and mild post-sharpening. Avoid nearest-neighbor, a single bilinear shrink, or blur-only cleanup for UI art.
    - For panels/buttons/frames intended for nine-slice, do not uniformly shrink an already-large complete panel when that destroys corners and border detail. Prefer resizing source art to the target cap size, then use engine nine-slice for larger layout sizes.
    - Keep important final asset sizes as named exports, such as `icon-coin__64.png`, `icon-coin__128.png`, or `panel-inventory__512x256.png`, instead of one oversized source reused everywhere.
 
@@ -70,6 +71,8 @@ python <skill-root>/scripts/resize_assets_high_quality.py \
   --input <clean-alpha-png-folder> \
   --output <final-size-png-folder> \
   --max-side 512 \
+  --denoise auto \
+  --sampler area-lanczos \
   --prefilter 0.18
 ```
 

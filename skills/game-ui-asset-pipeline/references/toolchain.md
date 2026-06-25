@@ -117,9 +117,15 @@ Preferred order:
 1. Generate near the final intended size whenever the backend can do it cleanly.
 2. If extra resolution is useful, generate a controlled 2x/3x source, not an arbitrary oversized sheet.
 3. Crop or slice to one finished component first, add transparent padding, then resize the component. Do not downscale a whole atlas with large gutters and then cut it.
-4. For transparent PNGs, resize with premultiplied alpha and clear RGB in fully transparent pixels after resizing.
-5. For reductions larger than about 2x, use multi-step Lanczos resizing. Add a tiny prefilter only when texture noise sparkles or clumps, then use mild unsharp masking to recover UI edge clarity.
-6. Inspect the resized result at 100 percent on both dark and light backgrounds before packaging.
+4. Prefer mature open-source resize engines when available:
+   - OpenCV `INTER_AREA` for shrinking/decimation, especially when aliasing or moire appears.
+   - libvips/sharp resize with Lanczos kernel and alpha premultiplication for fast batch work.
+   - ImageMagick filtered resize plus controlled `-unsharp` when command-line image processing is already installed.
+5. For transparent PNGs, resize with premultiplied alpha and clear RGB in fully transparent pixels after resizing.
+6. For reductions larger than about 2x, use an area/box pre-shrink before the final Lanczos pass. This suppresses high-frequency detail before it aliases into muddy pixels.
+7. Use edge-aware flat-area denoise before downsampling when painterly texture sparkles or clumps. Do not blur the entire UI; preserve borders, icon silhouettes, and nine-slice corners.
+8. Use mild unsharp masking only after the final resize to recover UI edge clarity. Do not sharpen enough to create halos.
+9. Inspect the resized result at 100 percent on both dark and light backgrounds before packaging.
 
 Use the bundled helper for final-size exports:
 
@@ -128,6 +134,8 @@ python <skill-root>/scripts/resize_assets_high_quality.py \
   --input <clean-alpha-png-folder> \
   --output <final-size-png-folder> \
   --max-side 512 \
+  --denoise auto \
+  --sampler area-lanczos \
   --prefilter 0.18
 ```
 
@@ -138,13 +146,18 @@ python <skill-root>/scripts/resize_assets_high_quality.py \
   --input icon-coin-source.png \
   --output final-icons \
   --target-size 128x128 \
+  --denoise light \
+  --sampler area-lanczos \
   --prefilter 0.12
 ```
+
+The helper chooses `--engine auto` by default. If Python OpenCV is installed, it uses OpenCV `INTER_AREA` for shrinking. Otherwise it falls back to Pillow with area-style BOX preshrink plus Lanczos final resize. Both paths premultiply alpha before resampling and clear alpha-0 RGB after output.
 
 Avoid these failure modes:
 
 - one-step runtime shrink from 1024/2048 px source to 32/64 px UI;
 - bilinear shrink for painterly UI;
+- blur-only "denoise", which removes UI borders before the resize;
 - resizing straight-alpha PNGs without premultiplication, which creates dark or colored rims;
 - shrinking text-baked UI labels and then trying to sharpen unreadable text;
 - uniformly shrinking a nine-slice panel to solve layout sizing. Keep a clean cap/corner texture and let the engine stretch the center.

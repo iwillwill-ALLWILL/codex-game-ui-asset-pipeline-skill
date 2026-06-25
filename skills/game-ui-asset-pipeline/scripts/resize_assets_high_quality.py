@@ -2,8 +2,17 @@
 """Resize generated UI PNGs for final in-game use.
 
 The helper avoids the common failure where oversized generated assets are forced
-down by an engine or browser and become noisy, muddy, or fringed. Transparent
-PNGs are resized in premultiplied-alpha space, then alpha-0 RGB is cleared.
+down by an engine or browser and become noisy, muddy, or fringed.
+
+The default path uses a mature downsampling chain:
+
+- isolate/crop before resize in the broader pipeline;
+- optional edge-aware flat-area denoise before decimation;
+- premultiply alpha before any resampling;
+- use OpenCV INTER_AREA when available, otherwise area-style BOX preshrink plus
+  Lanczos final resize;
+- unpremultiply and clear RGB in alpha-0 pixels after resize;
+- apply a mild final unsharp mask for UI edge recovery.
 """
 
 from __future__ import annotations
@@ -16,6 +25,13 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageChops, ImageFilter
+
+DENOISE_PROFILES = {
+    "off": {"radius": 0.0, "strength": 0.0, "edge": 1},
+    "light": {"radius": 0.45, "strength": 0.35, "edge": 10},
+    "medium": {"radius": 0.75, "strength": 0.52, "edge": 14},
+    "strong": {"radius": 1.1, "strength": 0.7, "edge": 18},
+}
 
 
 def parse_size(value: str) -> tuple[int, int]:
@@ -70,16 +86,19 @@ def compute_target(size: tuple[int, int], args: argparse.Namespace) -> tuple[int
     return target
 
 
-def resize_multistep(image: Image.Image, target: tuple[int, int]) -> Image.Image:
-    resample = Image.Resampling.LANCZOS
+def resize_multistep(image: Image.Image, target: tuple[int, int], sampler: str) -> Image.Image:
     current = image
     target_width, target_height = target
+    if sampler == "box":
+        return current.resize(target, Image.Resampling.BOX)
+
+    preshrink_resample = Image.Resampling.BOX if sampler == "area-lanczos" else Image.Resampling.LANCZOS
     while current.width > target_width * 2 or current.height > target_height * 2:
         next_width = max(target_width, math.ceil(current.width / 2))
         next_height = max(target_height, math.ceil(current.height / 2))
-        current = current.resize((next_width, next_height), resample)
+        current = current.resize((next_width, next_height), preshrink_resample)
     if current.size != target:
-        current = current.resize(target, resample)
+        current = current.resize(target, Image.Resampling.LANCZOS)
     return current
 
 
@@ -126,6 +145,43 @@ def clear_transparent_rgb(rgba: Image.Image) -> Image.Image:
     return image
 
 
+def resolve_denoise(source_size: tuple[int, int], target: tuple[int, int], denoise: str) -> str:
+    if denoise != "auto":
+        return denoise
+    ratio = min(target[0] / source_size[0], target[1] / source_size[1])
+    if ratio <= 0.25:
+        return "medium"
+    if ratio <= 0.67:
+        return "light"
+    return "off"
+
+
+def edge_aware_denoise_rgba(rgba: Image.Image, profile_name: str) -> Image.Image:
+    profile = DENOISE_PROFILES[profile_name]
+    if profile["strength"] <= 0:
+        return rgba.convert("RGBA")
+
+    image = rgba.convert("RGBA")
+    red, green, blue, alpha = image.split()
+    rgb = Image.merge("RGB", (red, green, blue))
+    blurred_rgb = rgb.filter(ImageFilter.GaussianBlur(profile["radius"]))
+
+    gray = rgb.convert("L")
+    blurred_gray = gray.filter(ImageFilter.GaussianBlur(profile["radius"]))
+    edge = ImageChops.difference(gray, blurred_gray)
+    edge_threshold = max(1, int(profile["edge"]))
+    strength = float(profile["strength"])
+
+    def flat_area_mask(value: int) -> int:
+        flatness = max(0.0, 1.0 - min(1.0, value / edge_threshold))
+        return round(255 * strength * flatness)
+
+    mask = edge.point(flat_area_mask)
+    denoised_rgb = Image.composite(blurred_rgb, rgb, mask)
+    red, green, blue = denoised_rgb.split()
+    return Image.merge("RGBA", (red, green, blue, alpha))
+
+
 def filter_rgb(image: Image.Image, image_filter: ImageFilter.Filter) -> Image.Image:
     red, green, blue, alpha = image.convert("RGBA").split()
     rgb = Image.merge("RGB", (red, green, blue)).filter(image_filter)
@@ -133,11 +189,12 @@ def filter_rgb(image: Image.Image, image_filter: ImageFilter.Filter) -> Image.Im
     return Image.merge("RGBA", (red, green, blue, alpha))
 
 
-def resize_rgba(image: Image.Image, target: tuple[int, int], args: argparse.Namespace) -> Image.Image:
-    premul = premultiply(image.convert("RGBA"))
+def resize_rgba(image: Image.Image, target: tuple[int, int], args: argparse.Namespace, denoise_profile: str) -> Image.Image:
+    rgba = edge_aware_denoise_rgba(image.convert("RGBA"), denoise_profile)
+    premul = premultiply(rgba)
     if args.prefilter > 0:
         premul = filter_rgb(premul, ImageFilter.GaussianBlur(args.prefilter))
-    resized = resize_multistep(premul, target)
+    resized = resize_multistep(premul, target, args.sampler)
     result = unpremultiply(resized)
     if not args.no_sharpen and args.unsharp_percent > 0:
         result = filter_rgb(
@@ -151,11 +208,13 @@ def resize_rgba(image: Image.Image, target: tuple[int, int], args: argparse.Name
     return clear_transparent_rgb(result)
 
 
-def resize_opaque(image: Image.Image, target: tuple[int, int], args: argparse.Namespace) -> Image.Image:
+def resize_opaque(image: Image.Image, target: tuple[int, int], args: argparse.Namespace, denoise_profile: str) -> Image.Image:
     work = image.convert("RGB")
+    if denoise_profile != "off":
+        work = edge_aware_denoise_rgba(work.convert("RGBA"), denoise_profile).convert("RGB")
     if args.prefilter > 0:
         work = work.filter(ImageFilter.GaussianBlur(args.prefilter))
-    work = resize_multistep(work, target)
+    work = resize_multistep(work, target, args.sampler)
     if not args.no_sharpen and args.unsharp_percent > 0:
         work = work.filter(
             ImageFilter.UnsharpMask(
@@ -165,6 +224,48 @@ def resize_opaque(image: Image.Image, target: tuple[int, int], args: argparse.Na
             )
         )
     return work
+
+
+def has_cv2() -> bool:
+    try:
+        import cv2  # noqa: F401
+        import numpy  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def select_engine(args: argparse.Namespace) -> str:
+    if args.engine == "opencv":
+        if not has_cv2():
+            raise SystemExit("OpenCV engine requested, but cv2/numpy is not available")
+        return "opencv"
+    if args.engine == "auto" and has_cv2():
+        return "opencv"
+    return "pillow"
+
+
+def resize_opencv(image: Image.Image, target: tuple[int, int], args: argparse.Namespace, denoise_profile: str) -> Image.Image:
+    import cv2
+    import numpy as np
+
+    source = image.convert("RGBA")
+    source = edge_aware_denoise_rgba(source, denoise_profile)
+    premul = premultiply(source)
+    array = np.array(premul)
+    interpolation = cv2.INTER_AREA if target[0] <= source.width and target[1] <= source.height else cv2.INTER_LANCZOS4
+    resized = cv2.resize(array, target, interpolation=interpolation)
+    result = unpremultiply(Image.fromarray(resized, "RGBA"))
+    if not args.no_sharpen and args.unsharp_percent > 0:
+        result = filter_rgb(
+            result,
+            ImageFilter.UnsharpMask(
+                radius=args.unsharp_radius,
+                percent=args.unsharp_percent,
+                threshold=args.unsharp_threshold,
+            ),
+        )
+    return clear_transparent_rgb(result)
 
 
 def output_path_for(path: Path, input_root: Path, args: argparse.Namespace) -> Path:
@@ -182,6 +283,8 @@ def process_file(path: Path, input_root: Path, args: argparse.Namespace) -> dict
     with Image.open(path) as opened:
         source = opened.copy()
     target = compute_target(source.size, args)
+    denoise_profile = resolve_denoise(source.size, target, args.denoise)
+    engine = select_engine(args)
     output = output_path_for(path, input_root, args)
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -193,19 +296,27 @@ def process_file(path: Path, input_root: Path, args: argparse.Namespace) -> dict
             "output": str(output),
             "source_size": list(source.size),
             "target_size": list(target),
+            "engine": engine,
+            "sampler": args.sampler,
+            "denoise": denoise_profile,
             "changed": False,
         }
 
-    if "A" in source.getbands():
-        resized = resize_rgba(source, target, args)
+    if engine == "opencv":
+        resized = resize_opencv(source, target, args, denoise_profile)
+    elif "A" in source.getbands():
+        resized = resize_rgba(source, target, args, denoise_profile)
     else:
-        resized = resize_opaque(source, target, args)
+        resized = resize_opaque(source, target, args, denoise_profile)
     resized.save(output)
     return {
         "source": str(path),
         "output": str(output),
         "source_size": list(source.size),
         "target_size": list(target),
+        "engine": engine,
+        "sampler": args.sampler,
+        "denoise": denoise_profile,
         "changed": True,
     }
 
@@ -222,6 +333,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-height", type=int, help="Limit height while preserving aspect ratio.")
     parser.add_argument("--allow-upscale", dest="skip_upscale", action="store_false", help="Allow upscaling.")
     parser.set_defaults(skip_upscale=True)
+    parser.add_argument("--engine", choices=("auto", "pillow", "opencv"), default="auto", help="Resize backend. auto uses OpenCV INTER_AREA when cv2 is installed.")
+    parser.add_argument("--sampler", choices=("area-lanczos", "lanczos", "box"), default="area-lanczos", help="Pillow fallback sampler. area-lanczos uses BOX preshrink then Lanczos final resize.")
+    parser.add_argument("--denoise", choices=("off", "auto", "light", "medium", "strong"), default="auto", help="Edge-aware flat-area denoise before downsampling.")
     parser.add_argument("--prefilter", type=float, default=0.0, help="Small Gaussian blur before downscale, e.g. 0.12-0.25.")
     parser.add_argument("--no-sharpen", action="store_true", help="Disable mild post-resize unsharp mask.")
     parser.add_argument("--unsharp-radius", type=float, default=0.55)
@@ -247,6 +361,9 @@ def main(argv: list[str] | None = None) -> int:
     report = {
         "input": str(args.input),
         "output": str(args.output) if args.output else None,
+        "engine_requested": args.engine,
+        "sampler": args.sampler,
+        "denoise_requested": args.denoise,
         "count": len(results),
         "changed": sum(1 for item in results if item["changed"]),
         "files": results,
