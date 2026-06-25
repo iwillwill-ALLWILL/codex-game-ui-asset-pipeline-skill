@@ -2,6 +2,8 @@
 
 这个 Skill 用来把用户自己的参考图、提示词、风格说明、UI 截图，变成可以放进游戏里的 UI 组件包。
 
+它也可以当成一个游戏 UI 素材工具箱来用。不是只有“生成一整套 UI”才需要调用它；抠图、透明背景清理、图片缩小、图集切分、PNG 打包、PNG 转 Godot 起步文件这类小任务，也都可以统一走 `$game-ui-asset-pipeline`。
+
 最推荐的路线是：
 
 ```text
@@ -23,7 +25,12 @@
 - 从一张参考图扩展同风格 UI
 - 从 UI 截图或概念图里试拆组件
 - 清理素材边缘粉色/绿色背景颗粒
+- 批量抠图、去底、清理透明 PNG 的脏边和隐藏颜色
+- 把过大的 PNG 高质量缩小到游戏里实际会用的尺寸
+- 从图集或生成大图里切出单独组件，并检查有没有多切、少切、粘连
 - 把已有透明 PNG 整理成 Godot 默认可用的组件包
+- 生成 `overview.png`，方便快速检查整包素材
+- 输出 Godot 起步 `.tscn`，后续可接 NinePatchRect、TextureButton、TextureProgressBar
 
 它不是单独的生图模型。它会调度当前平台已有的识图、生图、抠图、透明背景、图集整理、文件读写、Godot 输出能力。平台没有这些能力时，它只能作为提示词和流程参考，不能保证直接产出图片文件。
 
@@ -75,6 +82,57 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 图片编辑/抠图 | 处理透明背景、边缘残留、截图拆分 |
 | 文件读写 | 保存风格库、PNG、overview、Godot 文件 |
 | 脚本/工作流 | 批量命名、检查、分类、打包 |
+| 图片缩放 | 把大图高质量降采样成游戏实际尺寸，避免强缩后噪点糊在一起 |
+
+## 它也可以当常用小工具用
+
+不想生成完整 UI 包时，直接把 `$game-ui-asset-pipeline` 当素材处理入口用。这样做的好处是：同一套命名、透明背景、尺寸、overview、Godot 输出规则都会保持一致，不会每次临时处理出一堆散乱文件。
+
+| 小功能 | 什么时候用 | 你可以怎么说 |
+|---|---|---|
+| 抠图 / 去底 | 有 PNG/JPG，但背景不是透明 | `使用 $game-ui-asset-pipeline，把这些图片抠成透明 PNG，一张图只保留一个素材。` |
+| 清理边缘残留 | 透明图周围有粉色、绿色、青色、暗色脏边 | `使用 $game-ui-asset-pipeline，清理这批透明 PNG 的边缘残留和隐藏背景色。` |
+| 高质量缩小 | 大图放进游戏后被强制缩小，出现噪点、糊边、细节粘在一起 | `使用 $game-ui-asset-pipeline，把这些 PNG 高质量缩小到最长边 512，透明边缘不能脏。` |
+| 图集切分 | 一张大图里有多个按钮、图标、面板 | `使用 $game-ui-asset-pipeline，从这张图集里切出独立组件，每张 PNG 只能有一个完整组件。` |
+| PNG 分类整理 | 已经有一堆 PNG，但命名和目录混乱 | `使用 $game-ui-asset-pipeline，把这个 PNG 文件夹按 panels、buttons、icons、bars 分类整理。` |
+| PNG 转 Godot UI 包 | 已有透明 PNG，想直接进 Godot | `使用 $game-ui-asset-pipeline，把这些 PNG 打包成 Godot 可用 UI 组件包，生成 overview 和 .tscn。` |
+| 生成 overview | 想快速预览一批素材有没有问题 | `使用 $game-ui-asset-pipeline，给这个素材包重新生成 overview.png。` |
+| 检查素材质量 | 不确定有没有多切、少切、透明脏边、尺寸过大 | `使用 $game-ui-asset-pipeline，检查这批 UI 素材是否能直接放进游戏。` |
+
+这些小工具任务也应该遵守最终交付规则：
+
+| 规则 | 标准 |
+|---|---|
+| 一张图一个对象 | 不要有两个半截组件、粘连邻居、残留边条 |
+| 透明图真透明 | 可见边缘不能有 key color，alpha 为 0 的像素也不能藏青色/粉色/绿色 RGB |
+| 缩放后能用 | 在目标尺寸 100% 查看不糊、不脏、不出彩边 |
+| 目录干净 | 公共输出只保留最终 PNG、overview 和用户要求的引擎文件 |
+| 引擎默认 Godot | Unity/Cocos/JSON/debug 只有明确要求时才输出 |
+
+常用命令背后会优先复用 skill 里的脚本和平台工具：
+
+```bash
+# 清理透明边缘和隐藏 key-color RGB
+python <skill-root>/scripts/clean_alpha_fringe.py \
+  --input <png-or-folder> \
+  --backup <backup-folder> \
+  --report-json <qa-report.json>
+
+# 高质量缩小透明 PNG，避免大图强缩后变脏变糊
+python <skill-root>/scripts/resize_assets_high_quality.py \
+  --input <png-or-folder> \
+  --output <final-size-folder> \
+  --max-side 512 \
+  --prefilter 0.18
+
+# 把 PNG 打包成分类目录、overview 和 Godot 起步文件
+python <skill-root>/scripts/package_ui_assets.py \
+  --input <folder-with-pngs> \
+  --output <output-folder> \
+  --pack-name <pack-slug> \
+  --engines godot \
+  --category-subdirs
+```
 
 ## 最推荐的三种用法
 
