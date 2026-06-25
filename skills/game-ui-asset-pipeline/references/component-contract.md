@@ -181,4 +181,7 @@ Generated UI components should not contain visible chroma-key pixels after alpha
 - Use selected key colors only as removable backgrounds, not as final UI decoration, unless the user explicitly wants that color.
 - Clean with a soft matte and despill before slicing atlases; otherwise key-colored pixels can become baked into the component edge.
 - If the packager reports `possible chroma-key residue`, inspect the asset on a dark and light checker background, then rerun chroma cleanup or regenerate with native alpha.
+- Treat `#00ffff`/cyan and dark teal generated backgrounds as key-color residue too. Cyan may appear as saturated pixels, pale antialiasing, or dark patterned corner backgrounds.
+- Validate hidden RGB, not just visible alpha. Alpha-0 pixels must not retain key-colored RGB because game importers, thumbnails, and texture filtering can reveal it as a colored rim.
+- Use `scripts/clean_alpha_fringe.py` after matte cleanup when a batch still has visible cyan/pink/green edge pixels, edge-connected teal background patches, or alpha-0 key RGB.
 - Keep enough transparent padding after cleanup so nine-slice corners, button glows, and icon silhouettes are not clipped.

@@ -81,6 +81,24 @@ python <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py \
 - Use `edge-feather 0.25-0.75` after contraction when the edge looks jagged.
 - Run the packager after cleanup and treat `possible chroma-key residue` warnings as a QA failure unless that saturated key color is deliberately part of the UI.
 - Do not solve key-color dust by only trimming the bounding box. Trimming removes empty canvas but does not remove contaminated edge pixels.
+- Do not trust visible-pixel checks alone. Fully transparent pixels can still contain cyan/key-colored RGB; some viewers and game texture filtering can leak that hidden color around the asset edge.
+
+Run the skill cleanup helper after the first matte pass when any cyan/teal/pink/green residue remains, when generated components still show patterned key backgrounds in the corners, or before final packaging of a large component kit:
+
+```bash
+python <skill-root>/scripts/clean_alpha_fringe.py \
+  --input <folder-or-png> \
+  --backup <backup-folder> \
+  --report-json <qa-report.json>
+```
+
+The helper removes three failure classes:
+
+- edge-connected key/background patches, including dark teal/cyan patterned corners from generated sheets;
+- visible key-colored pixels exposed along the alpha boundary after repeated cleanup passes;
+- key-colored RGB stored in alpha-0 pixels. Final alpha-0 pixels should not keep `#00ffff`, `#ff00ff`, `#00ff00`, or similar key colors.
+
+After running it, rebuild contact sheets/overviews from the cleaned PNGs and inspect on both light and dark solid backgrounds. If a component intentionally has blue/green interior art, the cleanup should preserve it when it is enclosed by the component frame; only edge-connected background regions should be removed. The default pass is conservative for visible edge art: if a light/dark review still shows a visible cyan edge after the default pass, rerun only the affected files with `--clean-visible-edge-key`; use `--aggressive-edge-cold-cyan` only for confirmed cyan fringe because it can erode legitimate cold-colored edge art.
 
 Escalate to open-source matting/removal tools when the background is not a clean flat key, when the object edge is fuzzy, or when generation produced shadows/reflections on the background:
 

@@ -45,6 +45,7 @@ GENERIC_TOKENS = {"ui", "game", "asset", "sprite", "generated", "art", "texture"
 KEY_COLOR_CANDIDATES = {
     "#ff00ff": (255, 0, 255),
     "#00ff00": (0, 255, 0),
+    "#00ffff": (0, 255, 255),
     "#0000ff": (0, 0, 255),
 }
 VISIBLE_ALPHA_THRESHOLD = 16
@@ -197,31 +198,39 @@ def detect_chroma_key_residue(image) -> list[dict[str, Any]]:
     width, height = rgba.size
     visible = 0
     counts = {key_hex: 0 for key_hex in KEY_COLOR_CANDIDATES}
+    hidden_counts = {key_hex: 0 for key_hex in KEY_COLOR_CANDIDATES}
 
     for y in range(height):
         for x in range(width):
             red, green, blue, alpha = pixels[x, y]
+            rgb = (red, green, blue)
             if alpha <= VISIBLE_ALPHA_THRESHOLD:
+                if alpha == 0:
+                    for key_hex, key_rgb in KEY_COLOR_CANDIDATES.items():
+                        if looks_like_key_color(rgb, key_rgb):
+                            hidden_counts[key_hex] += 1
                 continue
             visible += 1
-            rgb = (red, green, blue)
             for key_hex, key_rgb in KEY_COLOR_CANDIDATES.items():
                 if looks_like_key_color(rgb, key_rgb):
                     counts[key_hex] += 1
 
-    if visible == 0:
+    if visible == 0 and not any(hidden_counts.values()):
         return []
 
-    minimum = max(KEY_RESIDUE_MIN_PIXELS, int(visible * KEY_RESIDUE_MIN_RATIO))
+    minimum = max(KEY_RESIDUE_MIN_PIXELS, int(max(visible, 1) * KEY_RESIDUE_MIN_RATIO))
     residue: list[dict[str, Any]] = []
     for key_hex, count in counts.items():
-        if count >= minimum:
+        hidden_count = hidden_counts[key_hex]
+        if count >= minimum or hidden_count >= KEY_RESIDUE_MIN_PIXELS:
             residue.append(
                 {
                     "key": key_hex,
-                    "pixels": count,
+                    "pixels": count + hidden_count,
+                    "visible_pixels_with_key_rgb": count,
+                    "transparent_pixels_with_key_rgb": hidden_count,
                     "visible_pixels": visible,
-                    "ratio": round(count / visible, 6),
+                    "ratio": round(count / max(visible, 1), 6),
                 }
             )
     return residue
@@ -274,7 +283,9 @@ def inspect_png(path: Path, component_type: str, part: str | None) -> dict[str, 
         for residue in chroma_key_residue:
             warnings.append(
                 f"possible {residue['key']} chroma-key residue "
-                f"({residue['pixels']} visible pixels); clean with soft matte/despill before packaging"
+                f"({residue['visible_pixels_with_key_rgb']} visible pixels, "
+                f"{residue['transparent_pixels_with_key_rgb']} transparent pixels with key RGB); "
+                "clean with soft matte/despill, edge cleanup, and transparent RGB wipe before packaging"
             )
 
         return {

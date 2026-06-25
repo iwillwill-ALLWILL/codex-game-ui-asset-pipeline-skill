@@ -62,6 +62,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - If the recommended key is still close to visible colors, switch to native alpha, LayerDiffuse, rembg/BiRefNet, or a custom key color rather than forcing a bad key.
    - Pink/green particles around UI pieces are chroma-key spill, not a normal trim problem. Remove the key color with a soft matte, despill, and a 1px edge contract before splitting atlases into components.
    - Reuse the installed `imagegen` helper when available; do not rewrite chroma-key removal.
+   - After chroma-key cleanup, also remove edge-connected teal/cyan background patches and hidden key-color RGB in fully transparent pixels. A PNG can look transparent but still leak cyan through image viewers or game texture filtering if alpha-0 pixels keep key-colored RGB.
 
 ```bash
 python <skill-root>/scripts/suggest_key_color.py --input <reference-image-or-folder>
@@ -77,6 +78,11 @@ python <codex-home>/skills/.system/imagegen/scripts/remove_chroma_key.py \
   --edge-feather 0.25 \
   --despill \
   --force
+
+python <skill-root>/scripts/clean_alpha_fringe.py \
+  --input <folder-or-png> \
+  --backup <backup-folder> \
+  --report-json <qa-report.json>
 ```
 
 6. Package the PNGs into level folders.
@@ -106,6 +112,7 @@ For a generated common UI kit, `level_01_complete` alone is acceptable when ever
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
    - Verify each button has at least a normal state, each progress bar has background/fill when possible, and stretchable components have reasonable slice margins.
    - Inspect cutout edges on dark and light backgrounds. If a frame loses visible pixels, add margin and rebuild the mask; if it includes scene-background pixels, use a tighter segmentation/matting pass.
+   - Scan both visible edge pixels and alpha-0 RGB. Final transparent PNGs should have no visible key/cyan edge pixels and no hidden key-colored RGB in fully transparent pixels; clean with `scripts/clean_alpha_fringe.py` before rebuilding overviews.
    - Inspect single-component purity. A packager warning count of zero is not enough: scan alpha connected components and review a candidate contact sheet for assets with multiple significant components, sticky edge fragments, or half-cropped neighbors. Each delivered PNG should contain one usable component with transparent padding.
    - Inspect for over-cutting. If panels, frames, buttons, or HUD elements are missing sides, ornaments, fills, or frame pieces, do not "fix" by keeping the largest blob. Re-slice from the raw generated sheet using real cell boundaries, or regenerate that category.
    - If assets are blank, cropped, noisy, text-baked by accident, inconsistent across states, or only approximate because the concept screenshot is ambiguous, regenerate or clean them before integration.
