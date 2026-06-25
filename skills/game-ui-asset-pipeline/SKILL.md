@@ -52,6 +52,9 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - For uncertain screenshot edges, use conservative masks: crop with margin, expand/close the mask before matting, keep the full visible stroke, then trim only transparent padding. A slightly larger mask is easier to fix than a clipped frame edge.
    - When a frame blends into the background, is hidden by text, or is occluded by scene art, do not pretend the screenshot contains clean reusable source layers. Either mark the extracted asset as approximate, manually refine the mask, or regenerate that component from the stored style library.
    - For style-library generation, reuse palette hex values and visual rules from the selected style card across the whole batch.
+   - For final component packs, one PNG means one semantic component. After atlas/sheet slicing and cleanup, run alpha connected-component QA to catch multiple large disconnected subjects, half-neighbor fragments, sticky leftover strips, and edge scraps. Remove fragments only when the remaining component is visually complete; do not ship a PNG containing two partial UI pieces.
+   - For generated UI sheets/atlases, inspect the raw sheet layout before slicing. Do not assume a fixed grid when rows have different column counts or cells vary in size. Slice by true separator lines, cell bounds, or foreground component bounds from the original generated sheet. If fixed-grid slicing produced sticky neighbors or half-missing components, discard those derived crops and re-slice from the raw sheet.
+   - Do not use "keep only the largest connected component" as a blanket cleanup for panels, frames, buttons, or HUD widgets. A single UI component may contain disconnected rivets, ornaments, frame sides, glow, or internal line art. Use connected-component analysis to find candidates for visual review, then remove only obvious background/separator scraps or regenerate/reslice from the original sheet.
 
 5. Choose and clean the alpha/key background deliberately.
    - Run `scripts/suggest_key_color.py` on the reference image or style-library sources when native alpha is unavailable.
@@ -91,6 +94,8 @@ If the input folder has subfolders, each subfolder is treated as one split level
 
 Add `--project <game-project-root>` when the game project is local and should receive generated files.
 
+For a generated common UI kit, `level_01_complete` alone is acceptable when every PNG is already one finished usable component/state/part. Additional levels are for progressive extraction granularity, such as `level_02_parts`, `level_03_atomic`, or screenshot decomposition. Do not create fake levels just to increase folder count.
+
 7. Integrate.
    - Godot default: use generated `.tscn` starter scenes; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
    - Unity/Cocos/generic: generate only when explicitly requested to keep output focused.
@@ -101,6 +106,8 @@ Add `--project <game-project-root>` when the game project is local and should re
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
    - Verify each button has at least a normal state, each progress bar has background/fill when possible, and stretchable components have reasonable slice margins.
    - Inspect cutout edges on dark and light backgrounds. If a frame loses visible pixels, add margin and rebuild the mask; if it includes scene-background pixels, use a tighter segmentation/matting pass.
+   - Inspect single-component purity. A packager warning count of zero is not enough: scan alpha connected components and review a candidate contact sheet for assets with multiple significant components, sticky edge fragments, or half-cropped neighbors. Each delivered PNG should contain one usable component with transparent padding.
+   - Inspect for over-cutting. If panels, frames, buttons, or HUD elements are missing sides, ornaments, fills, or frame pieces, do not "fix" by keeping the largest blob. Re-slice from the raw generated sheet using real cell boundaries, or regenerate that category.
    - If assets are blank, cropped, noisy, text-baked by accident, inconsistent across states, or only approximate because the concept screenshot is ambiguous, regenerate or clean them before integration.
 
 ## Resource Navigation

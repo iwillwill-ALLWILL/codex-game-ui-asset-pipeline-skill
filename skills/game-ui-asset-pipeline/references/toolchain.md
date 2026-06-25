@@ -7,6 +7,7 @@ Use this reference to avoid rebuilding existing tools.
 - Built-in `image_gen`: default when the user asks from a prompt/reference and no local project-specific generator is configured.
 - ComfyUI: use when a local workflow already exists, when exact reference-image control is needed, or when the user wants repeatable batch generation. Prefer existing workflows using IP-Adapter, ControlNet, LayerDiffuse, or inpainting nodes instead of designing a full new graph.
 - AUTOMATIC1111/Forge/InvokeAI: use only if already installed or clearly preferred by the project.
+- If a generation backend is blocked or unavailable for a requested UI kit, try another generation backend when available or report the blocker. Do not replace a requested generated kit with screenshot crops, manual placeholder art, or procedural shapes.
 
 ## Reference Matching
 
@@ -24,6 +25,8 @@ Use this reference to avoid rebuilding existing tools.
 ## Concept Screenshot Extraction
 
 Use concept screenshot extraction as a secondary path. It works for visible, well-separated UI pieces, but full UI mockups often do not contain clean source layers. A dark frame may share pixels with a dark tavern wall; a glow may fade into the background; text may cover the border. In these cases, edge errors are a source limitation, not only a bad crop.
+
+Only use this path when the user explicitly asks to extract/cut/salvage the visible screenshot elements. For "generate common UI", "style-library driven UI kit", "常用 UI", or similar requests, screenshots are references for generation and must not become the delivered component source.
 
 Use existing tools in this order:
 
@@ -96,6 +99,18 @@ Use `$generate2dsprite` for characters, animated effects, projectiles, impacts, 
 - Prefer Free Texture Packer when an atlas is required for Godot, Phaser, Pixi, Cocos2d, or generic JSON.
 - Prefer Unity Sprite Atlas or Addressables when the target is Unity.
 - Prefer engine-native import settings over custom atlas metadata if the game already has an asset pipeline.
+- When splitting generated sheets, fixed grids are only safe when every row and column is truly uniform. If rows have different column counts, gutters vary, or cells are mixed-size, detect real separator lines or foreground component bounds from the raw sheet before alpha cleanup.
+- If QA finds sticky neighbors, half-components, or missing frame pieces, return to the raw generated sheet and re-slice. Do not repeatedly clean or largest-component-filter already damaged crops.
+- Keep generated sheet contact sheets during QA, but keep them out of the public packaged output so `package_ui_assets.py` does not treat contact previews as a root asset level.
+
+## Local and Remote Skill Sync
+
+When this skill is updated from a real project failure, sync the lesson to both:
+
+- the installed local skill under `$CODEX_HOME/skills/game-ui-asset-pipeline`;
+- the source/remote skill repository when present, such as `open-source/codex-game-ui-asset-pipeline-skill/skills/game-ui-asset-pipeline`.
+
+Do not push remote changes unless the user explicitly asks. Validate both copies after editing so future local runs and future installs use the same rules.
 
 ## Editor Integration
 

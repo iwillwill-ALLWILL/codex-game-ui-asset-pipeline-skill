@@ -144,6 +144,36 @@ Do not include JSON, debug folders, raw atlases, or intermediate crops in the pu
 
 Use `package_ui_assets.py --category-subdirs` when the pack contains many different component types. Keep names descriptive even when category folders exist, such as `button-primary__normal.png`, `bar-health__fill.png`, and `icon-coin.png`.
 
+For generated full kits, a single `level_01_complete` folder is normal when it contains final complete components. More levels are only useful when they represent real granularity differences, for example complete card, frame-only, frame-and-dividers, and atomic parts. Do not create empty or duplicate levels to make the package look larger.
+
+## Single-Component Purity
+
+For final game-ready component packs, every PNG must contain exactly one semantic UI component or one state/part of a component. Do not ship sheet cells that still contain neighboring strips, two half-cropped components, sticky fragments, or multiple unrelated UI pieces.
+
+After alpha cleanup and cropping:
+
+1. Run an alpha connected-component scan on each PNG.
+2. Flag assets with more than one significant disconnected subject, edge-touching fragments after padding, long thin leftover strips, or small partial neighbors.
+3. Build a candidate contact sheet and inspect it visually before packaging.
+4. For flagged assets, keep the main component only when the extra pieces are obvious leftovers and the remaining component is visually complete. Do not use largest-component filtering on frames, panels, buttons, or HUD widgets when it would remove valid disconnected ornaments, sides, inner lines, rivets, or glows.
+5. Re-crop to the kept component and add transparent padding before final packaging.
+
+Disconnected pixels are acceptable only when they are clearly part of one component, such as small rivets attached visually to a frame, a controlled glow, or one icon silhouette. They are not acceptable when they look like another button, frame, header strip, side rail, or partial neighbor.
+
+## Generated Sheet Reslicing
+
+When UI components come from generated sheets or atlases, start from the raw generated sheet for final slicing. Do not keep iterating on already damaged crops.
+
+Use this order:
+
+1. Inspect the raw sheet/contact sheet first.
+2. Detect real separator lines and per-row/per-column cell bounds when the sheet has visible gutters.
+3. If the sheet has uneven rows, variable cell sizes, or mixed layouts, slice by true cell boundaries or foreground component bounds, not by a fixed grid.
+4. Remove the key/background color and separator-line antialiasing after each true cell crop.
+5. Re-check each final PNG on a contact sheet for two failure classes: extra half-neighbor pieces and missing half-components.
+
+If a generated cell itself contains multiple intentional small assets, split those assets separately only when each split remains complete. If a generated cell is structurally bad, regenerate that category instead of cutting away damage.
+
 ## Key-Color Hygiene
 
 Generated UI components should not contain visible chroma-key pixels after alpha cleanup.
