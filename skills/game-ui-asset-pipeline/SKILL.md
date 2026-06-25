@@ -1,6 +1,6 @@
 ---
 name: game-ui-asset-pipeline
-description: Generate, extract, style-match, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored project style libraries, or existing PNGs. Use when Codex needs to create full common UI kits, requested UI components, panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, organized PNG folders, Unity/Cocos outputs on request, or a persistent self-organizing style library from user-provided images/text/prompts. This skill should compose existing image generation, background removal, sprite, atlas, and editor/MCP tools instead of reimplementing them.
+description: Generate, extract, style-match, resize, clean, and package game-ready 2D UI component assets from prompts, uploaded reference images, stored project style libraries, or existing PNGs. Use when Codex needs to create full common UI kits, requested UI components, panels, buttons, progress bars, HUD frames, inventory slots, icons, UI states, nine-slice textures, atlases, Godot scenes, organized PNG folders, Unity/Cocos outputs on request, high-quality downscaled UI PNGs that avoid noisy/blurred forced scaling, or a persistent self-organizing style library from user-provided images/text/prompts. This skill should compose existing image generation, background removal, sprite, atlas, resize, and editor/MCP tools instead of reimplementing them.
 ---
 
 # Game UI Asset Pipeline
@@ -56,7 +56,24 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - For generated UI sheets/atlases, inspect the raw sheet layout before slicing. Do not assume a fixed grid when rows have different column counts or cells vary in size. Slice by true separator lines, cell bounds, or foreground component bounds from the original generated sheet. If fixed-grid slicing produced sticky neighbors or half-missing components, discard those derived crops and re-slice from the raw sheet.
    - Do not use "keep only the largest connected component" as a blanket cleanup for panels, frames, buttons, or HUD widgets. A single UI component may contain disconnected rivets, ornaments, frame sides, glow, or internal line art. Use connected-component analysis to find candidates for visual review, then remove only obvious background/separator scraps or regenerate/reslice from the original sheet.
 
-5. Choose and clean the alpha/key background deliberately.
+5. Resolve final pixel size before packaging or engine import.
+   - Do not rely on the engine, editor, or browser to force huge generated PNGs down to final UI size. Large one-step runtime scaling can turn painterly texture, bevels, antialiasing, and small ornaments into noisy muddy pixels.
+   - Prefer generating close to the intended final size, or generate a controlled 2x/3x source and downsample once during the asset pipeline.
+   - Crop/trim to the true component bounds first, add transparent padding, then resize. Do not resize a large sheet with empty gutters and then slice it.
+   - For transparent PNGs, resize with premultiplied alpha so dark/colored transparent pixels cannot bleed into the edge.
+   - For severe reductions, use multi-step Lanczos downsampling, optional light prefiltering, and mild post-sharpening. Avoid nearest-neighbor or a single bilinear shrink for UI art.
+   - For panels/buttons/frames intended for nine-slice, do not uniformly shrink an already-large complete panel when that destroys corners and border detail. Prefer resizing source art to the target cap size, then use engine nine-slice for larger layout sizes.
+   - Keep important final asset sizes as named exports, such as `icon-coin__64.png`, `icon-coin__128.png`, or `panel-inventory__512x256.png`, instead of one oversized source reused everywhere.
+
+```bash
+python <skill-root>/scripts/resize_assets_high_quality.py \
+  --input <clean-alpha-png-folder> \
+  --output <final-size-png-folder> \
+  --max-side 512 \
+  --prefilter 0.18
+```
+
+6. Choose and clean the alpha/key background deliberately.
    - Run `scripts/suggest_key_color.py` on the reference image or style-library sources when native alpha is unavailable.
    - Use the recommended key color consistently in the generation prompt and cleanup command.
    - If the recommended key is still close to visible colors, switch to native alpha, LayerDiffuse, rembg/BiRefNet, or a custom key color rather than forcing a bad key.
@@ -85,7 +102,7 @@ python <skill-root>/scripts/clean_alpha_fringe.py \
   --report-json <qa-report.json>
 ```
 
-6. Package the PNGs into level folders.
+7. Package the PNGs into level folders.
 
 ```bash
 python <skill-root>/scripts/package_ui_assets.py \
@@ -102,11 +119,11 @@ Add `--project <game-project-root>` when the game project is local and should re
 
 For a generated common UI kit, `level_01_complete` alone is acceptable when every PNG is already one finished usable component/state/part. Additional levels are for progressive extraction granularity, such as `level_02_parts`, `level_03_atomic`, or screenshot decomposition. Do not create fake levels just to increase folder count.
 
-7. Integrate.
+8. Integrate.
    - Godot default: use generated `.tscn` starter scenes; Godot UI stretch assets should become `NinePatchRect`, `TextureButton`, or `TextureProgressBar`.
    - Unity/Cocos/generic: generate only when explicitly requested to keep output focused.
 
-8. QA before reporting done.
+9. QA before reporting done.
    - Open the root `overview.png` and each level's `overview.png`.
    - Keep the public output focused: `level_xxx/png`, `level_xxx/godot`, and overview images.
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
@@ -115,6 +132,7 @@ For a generated common UI kit, `level_01_complete` alone is acceptable when ever
    - Scan both visible edge pixels and alpha-0 RGB. Final transparent PNGs should have no visible key/cyan edge pixels and no hidden key-colored RGB in fully transparent pixels; clean with `scripts/clean_alpha_fringe.py` before rebuilding overviews.
    - Inspect single-component purity. A packager warning count of zero is not enough: scan alpha connected components and review a candidate contact sheet for assets with multiple significant components, sticky edge fragments, or half-cropped neighbors. Each delivered PNG should contain one usable component with transparent padding.
    - Inspect for over-cutting. If panels, frames, buttons, or HUD elements are missing sides, ornaments, fills, or frame pieces, do not "fix" by keeping the largest blob. Re-slice from the raw generated sheet using real cell boundaries, or regenerate that category.
+   - Inspect scaled assets at 100 percent on the target background. If a large source was reduced and looks muddy, sparkly, or clumped, rebuild final-size PNGs with `scripts/resize_assets_high_quality.py` or regenerate closer to target size before packaging.
    - If assets are blank, cropped, noisy, text-baked by accident, inconsistent across states, or only approximate because the concept screenshot is ambiguous, regenerate or clean them before integration.
 
 ## Resource Navigation
@@ -126,6 +144,7 @@ For a generated common UI kit, `level_01_complete` alone is acceptable when ever
 - Run `scripts/package_ui_assets.py --help` for deterministic packaging options.
 - Run `scripts/ingest_style_reference.py --help` for persistent style-library commands.
 - Run `scripts/suggest_key_color.py --help` before chroma-key generation when the background key color is not obvious.
+- Run `scripts/resize_assets_high_quality.py --help` when generated PNGs are larger than the intended game size, when icons/panels look noisy after forced scaling, or when transparent edges darken after resize.
 
 ## Guardrails
 

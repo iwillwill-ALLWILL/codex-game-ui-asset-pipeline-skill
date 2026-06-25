@@ -114,6 +114,18 @@ The packager suggests conservative margins:
 
 Override margins in-engine when the generated art has unusually thick corners, shadows, or bevels.
 
+## Resolution and Scaling Contract
+
+Final delivered PNGs should match the intended game usage size closely enough that the engine does not have to hide oversized source detail by brute-force scaling.
+
+- Decide output sizes before packaging: icons commonly need fixed exports such as 32, 64, 128, or 256 px; panels/buttons should use target cap/corner dimensions plus nine-slice for layout stretching.
+- Keep source masters separately only while working. Public output should contain final game-ready sizes, not oversized raw generations unless the user asks for masters.
+- Use names or folders that make scale obvious when multiple sizes are delivered, such as `icon-coin__64.png`, `icon-coin__128.png`, `panel-inventory__512x256.png`, or `png/icons/128/`.
+- Downscale each isolated component after alpha cleanup and before packaging. Do not downscale a whole sheet and then slice, because gutters, neighboring cells, and key-color antialiasing will contaminate the final component.
+- For transparent assets, use premultiplied-alpha resizing and zero alpha-0 RGB after resizing to avoid colored rims in thumbnails and texture filtering.
+- For nine-slice UI, preserve corner and border detail at the target cap size; use engine stretch regions for larger layout sizes instead of shipping one enormous panel and shrinking it everywhere.
+- If a resized asset looks muddy or noisy at 100 percent, regenerate closer to target size or rerun `scripts/resize_assets_high_quality.py` with light prefiltering. Do not solve muddy downscales by sharpening aggressively enough to create halos.
+
 ## Output Scope
 
 Default output should be level-based and Godot-first. For small packs, a flat `png/` folder is acceptable. For full/common UI kits, use category subfolders under `png/`.

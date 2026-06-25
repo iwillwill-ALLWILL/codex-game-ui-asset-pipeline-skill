@@ -108,6 +108,47 @@ Escalate to open-source matting/removal tools when the background is not a clean
 - `backgroundremover`: CLI-oriented batch removal wrapper.
 - `RobustVideoMatting`: use for video or frame sequences, not static UI by default.
 
+## High-Quality Downscaling
+
+Use this when a generated UI PNG is much larger than the size used in-game, or when a large component becomes noisy, muddy, or clumped after the engine/editor/browser scales it down.
+
+Preferred order:
+
+1. Generate near the final intended size whenever the backend can do it cleanly.
+2. If extra resolution is useful, generate a controlled 2x/3x source, not an arbitrary oversized sheet.
+3. Crop or slice to one finished component first, add transparent padding, then resize the component. Do not downscale a whole atlas with large gutters and then cut it.
+4. For transparent PNGs, resize with premultiplied alpha and clear RGB in fully transparent pixels after resizing.
+5. For reductions larger than about 2x, use multi-step Lanczos resizing. Add a tiny prefilter only when texture noise sparkles or clumps, then use mild unsharp masking to recover UI edge clarity.
+6. Inspect the resized result at 100 percent on both dark and light backgrounds before packaging.
+
+Use the bundled helper for final-size exports:
+
+```bash
+python <skill-root>/scripts/resize_assets_high_quality.py \
+  --input <clean-alpha-png-folder> \
+  --output <final-size-png-folder> \
+  --max-side 512 \
+  --prefilter 0.18
+```
+
+For fixed sizes:
+
+```bash
+python <skill-root>/scripts/resize_assets_high_quality.py \
+  --input icon-coin-source.png \
+  --output final-icons \
+  --target-size 128x128 \
+  --prefilter 0.12
+```
+
+Avoid these failure modes:
+
+- one-step runtime shrink from 1024/2048 px source to 32/64 px UI;
+- bilinear shrink for painterly UI;
+- resizing straight-alpha PNGs without premultiplication, which creates dark or colored rims;
+- shrinking text-baked UI labels and then trying to sharpen unreadable text;
+- uniformly shrinking a nine-slice panel to solve layout sizing. Keep a clean cap/corner texture and let the engine stretch the center.
+
 ## Sprites and Animation
 
 Use `$generate2dsprite` for characters, animated effects, projectiles, impacts, summons, or sprite sheets. After it produces transparent frames/sheets, this skill can package icons, HUD elements, or static UI pieces around them.
