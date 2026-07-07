@@ -129,7 +129,7 @@ Final delivered PNGs should match the intended game usage size closely enough th
 
 ## Output Scope
 
-Default output should be level-based and Godot-first. For small packs, a flat `png/` folder is acceptable. For full/common UI kits, use category subfolders under `png/`.
+Default output should be level-based and target-engine aware. If a local game project root is available, detect the engine before creating engine files; otherwise keep the pack to clean PNG folders plus overview images until the target engine is known. For small packs, a flat `png/` folder is acceptable. For full/common UI kits, use category subfolders under `png/`.
 
 ```text
 <pack>/
@@ -146,14 +146,14 @@ Default output should be level-based and Godot-first. For small packs, a flat `p
 │   │   ├── icons/
 │   │   ├── frames/
 │   │   └── images/
-│   └── godot/
+│   └── <engine>/
 ├── level_02_atomic_parts/
 │   ├── overview.png
 │   ├── png/
-│   └── godot/
+│   └── <engine>/
 ```
 
-Do not include JSON, debug folders, raw atlases, or intermediate crops in the public output. Use `--write-manifest` only when debugging the packager itself. Generate Unity, Cocos, generic HTML/H5, or extra diagnostic files only when the user asks for them.
+Do not include JSON, debug folders, raw atlases, or intermediate crops in the public output. Use `--write-manifest` only when debugging the packager itself. Generate Godot, Unity, Cocos, generic HTML/H5, or extra diagnostic files only when the project is detected or the user asks for that target.
 
 Use `package_ui_assets.py --category-subdirs` when the pack contains many different component types. Keep names descriptive even when category folders exist, such as `button-primary__normal.png`, `bar-health__fill.png`, and `icon-coin.png`.
 

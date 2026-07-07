@@ -2,7 +2,7 @@
 
 这个 Skill 用来把用户自己的参考图、提示词、风格说明、UI 截图，变成可以放进游戏里的 UI 组件包。
 
-它也可以当成一个游戏 UI 素材工具箱来用。不是只有“生成一整套 UI”才需要调用它；抠图、透明背景清理、图片缩小、图集切分、PNG 打包、PNG 转 Godot 起步文件这类小任务，也都可以统一走 `$game-ui-asset-pipeline`。
+它也可以当成一个游戏 UI 素材工具箱来用。不是只有“生成一整套 UI”才需要调用它；抠图、透明背景清理、图片缩小、图集切分、PNG 打包、PNG 转目标引擎起步文件这类小任务，也都可以统一走 `$game-ui-asset-pipeline`。
 
 最推荐的路线是：
 
@@ -10,12 +10,12 @@
 用户上传资料
 -> AI 提炼成项目风格库
 -> AI 按风格库生成全套常用 UI 或指定 UI 组件
--> AI 清理透明背景、整理目录、输出 Godot 可用文件
+-> AI 清理透明背景、整理目录、按目标引擎输出可用文件
 -> 用户看 overview.png，把问题截图发回 AI 修
 -> 好结果继续沉淀进风格库
 ```
 
-你不需要先学抠图、图集、九宫格、Godot UI 节点、Python 脚本。能交给 AI 的就交给 AI。你要做的是：提供资料、说清楚需求、看结果、把截图和问题反馈给 AI。
+你不需要先学抠图、图集、九宫格、引擎 UI 节点、Python 脚本。能交给 AI 的就交给 AI。你要做的是：提供资料、说清楚需求、看结果、把截图和问题反馈给 AI。
 
 ## 这个 Skill 适合做什么
 
@@ -24,15 +24,16 @@
 - 按当前需求补指定 UI 组件或素材
 - 从一张参考图扩展同风格 UI
 - 从 UI 截图或概念图里试拆组件
+- 做简单 UI 帧动画，例如按钮呼吸、图标发光、奖励闪烁、进度条扫光、加载转圈、面板弹出
 - 清理素材边缘粉色/绿色背景颗粒
 - 批量抠图、去底、清理透明 PNG 的脏边和隐藏颜色
 - 把过大的 PNG 高质量缩小到游戏里实际会用的尺寸
 - 从图集或生成大图里切出单独组件，并检查有没有多切、少切、粘连
-- 把已有透明 PNG 整理成 Godot 默认可用的组件包
+- 把已有透明 PNG 按目标引擎整理成可用组件包
 - 生成 `overview.png`，方便快速检查整包素材
-- 输出 Godot 起步 `.tscn`，后续可接 NinePatchRect、TextureButton、TextureProgressBar
+- 按目标引擎输出起步文件或导入说明，例如 Godot `.tscn`、Unity/Cocos 导入建议、generic PNG 包
 
-它不是单独的生图模型。它会调度当前平台已有的识图、生图、抠图、透明背景、图集整理、文件读写、Godot 输出能力。平台没有这些能力时，它只能作为提示词和流程参考，不能保证直接产出图片文件。
+它不是单独的生图模型。它会调度当前平台已有的识图、生图、抠图、透明背景、图集整理、文件读写、目标引擎输出能力。平台没有这些能力时，它只能作为提示词和流程参考，不能保证直接产出图片文件。
 
 ## 安装
 
@@ -68,7 +69,7 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 要求：
 1. 保留 SKILL.md 的触发说明和工作流。
 2. 保留 references 里的组件清单、风格库规则、命名规则、工具选择规则。
-3. 保留 scripts 里的风格库入库、overview 生成、分层打包、Godot 输出能力。
+3. 保留 scripts 里的风格库入库、overview 生成、分层打包、目标引擎输出能力。
 4. 如果当前平台不能直接运行 Python 脚本，就把这些能力改造成当前平台可用的工具节点、插件动作或工作流。
 5. 安装后告诉我应该怎么用自然语言调用它。
 ```
@@ -80,13 +81,13 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 识图 | 看懂参考图、UI 截图、色卡、组件结构 |
 | 生图 | 生成按钮、面板、图标、进度条等 UI 资产 |
 | 图片编辑/抠图 | 处理透明背景、边缘残留、截图拆分 |
-| 文件读写 | 保存风格库、PNG、overview、Godot 文件 |
+| 文件读写 | 保存风格库、PNG、overview、目标引擎文件 |
 | 脚本/工作流 | 批量命名、检查、分类、打包 |
 | 图片缩放 | 把大图高质量降采样成游戏实际尺寸，避免强缩后噪点糊在一起 |
 
 ## 它也可以当常用小工具用
 
-不想生成完整 UI 包时，直接把 `$game-ui-asset-pipeline` 当素材处理入口用。这样做的好处是：同一套命名、透明背景、尺寸、overview、Godot 输出规则都会保持一致，不会每次临时处理出一堆散乱文件。
+不想生成完整 UI 包时，直接把 `$game-ui-asset-pipeline` 当素材处理入口用。这样做的好处是：同一套命名、透明背景、尺寸、overview、目标引擎输出规则都会保持一致，不会每次临时处理出一堆散乱文件。
 
 | 小功能 | 什么时候用 | 你可以怎么说 |
 |---|---|---|
@@ -95,7 +96,8 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 高质量缩小 | 大图放进游戏后被强制缩小，出现噪点、糊边、细节粘在一起 | `使用 $game-ui-asset-pipeline，把这些 PNG 高质量缩小到最长边 512，透明边缘不能脏。` |
 | 图集切分 | 一张大图里有多个按钮、图标、面板 | `使用 $game-ui-asset-pipeline，从这张图集里切出独立组件，每张 PNG 只能有一个完整组件。` |
 | PNG 分类整理 | 已经有一堆 PNG，但命名和目录混乱 | `使用 $game-ui-asset-pipeline，把这个 PNG 文件夹按 panels、buttons、icons、bars 分类整理。` |
-| PNG 转 Godot UI 包 | 已有透明 PNG，想直接进 Godot | `使用 $game-ui-asset-pipeline，把这些 PNG 打包成 Godot 可用 UI 组件包，生成 overview 和 .tscn。` |
+| PNG 转目标引擎 UI 包 | 已有透明 PNG，想直接进项目 | `使用 $game-ui-asset-pipeline，把这些 PNG 打包成我项目可用的 UI 组件包。如果我给了项目路径，先自动识别引擎；识别不出再问我。` |
+| 动态化 UI 组件 | 想让按钮、图标、奖励、进度条有简单动效 | `使用 $game-ui-asset-pipeline，把这个按钮做成 8 帧循环呼吸发光动画，输出透明 PNG 帧、preview.gif 和目标引擎接入说明。` |
 | 生成 overview | 想快速预览一批素材有没有问题 | `使用 $game-ui-asset-pipeline，给这个素材包重新生成 overview.png。` |
 | 检查素材质量 | 不确定有没有多切、少切、透明脏边、尺寸过大 | `使用 $game-ui-asset-pipeline，检查这批 UI 素材是否能直接放进游戏。` |
 
@@ -106,8 +108,9 @@ https://github.com/iwillwill-ALLWILL/codex-game-ui-asset-pipeline-skill
 | 一张图一个对象 | 不要有两个半截组件、粘连邻居、残留边条 |
 | 透明图真透明 | 可见边缘不能有 key color，alpha 为 0 的像素也不能藏青色/粉色/绿色 RGB |
 | 缩放后能用 | 在目标尺寸 100% 查看不糊、不脏、不出彩边 |
+| UI 动画稳定 | 每帧同尺寸、同锚点、边缘干净，有 `preview.gif`，循环首尾不跳 |
 | 目录干净 | 公共输出只保留最终 PNG、overview 和用户要求的引擎文件 |
-| 引擎默认 Godot | Unity/Cocos/JSON/debug 只有明确要求时才输出 |
+| 先识别目标引擎 | 有项目路径时先自动识别；没有项目路径、识别失败或混合工程时再问；不确定时输出 generic PNG 包 |
 
 常用命令背后会优先复用 skill 里的脚本和平台工具：
 
@@ -127,14 +130,17 @@ python <skill-root>/scripts/resize_assets_high_quality.py \
   --sampler area-lanczos \
   --prefilter 0.18
 
-# 把 PNG 打包成分类目录、overview 和 Godot 起步文件
+# 把 PNG 打包成分类目录、overview 和目标引擎导入文件
 python <skill-root>/scripts/package_ui_assets.py \
   --input <folder-with-pngs> \
   --output <output-folder> \
   --pack-name <pack-slug> \
-  --engines godot \
+  --engines auto \
+  --project <game-project-root> \
   --category-subdirs
 ```
+
+如果没有本地项目路径，就去掉 `--project`；`--engines auto` 会输出通用 PNG 包。用户明确指定 Godot、Unity、Cocos 或 generic 时，再把 `--engines auto` 改成对应目标。
 
 ## 最推荐的三种用法
 
@@ -281,13 +287,13 @@ python <skill-root>/scripts/package_ui_assets.py \
 5. 不要把文字烘焙进图片，文字交给游戏引擎。
 6. 按类别分批生成，质量优先，不要强行塞进一张大图。
 7. 面板、按钮、卡框要适合九宫格拉伸。
-8. 默认输出 Godot 可用文件，不要输出 Unity/Cocos/JSON/debug。
+8. 如果我提供项目路径，先自动识别目标引擎；没有项目路径或识别不出时再问我。
 
 输出目录：
 1. 根目录有 overview.png。
 2. 每个层级有自己的 overview.png。
 3. PNG 按 panels、buttons、bars、cards、slots、hud、icons、frames、images 分类。
-4. Godot 文件放到对应 godot 文件夹。
+4. 引擎文件放到对应引擎文件夹；如果目标引擎不确定，先输出 generic PNG 包。
 ```
 
 常用 UI 组件清单覆盖这些大类：
@@ -311,7 +317,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 
 | 来源 | 主要借鉴什么 |
 |---|---|
-| [Godot Control / UI 节点](https://docs.godotengine.org/en/stable/classes/class_control.html) | Godot 默认目标引擎的控件基类和 UI 组织方式 |
+| [Godot Control / UI 节点](https://docs.godotengine.org/en/stable/classes/class_control.html) | Godot 控件基类和 UI 组织方式 |
 | [Unity UI Toolkit](https://docs.unity3d.com/Manual/UIElements.html) | 通用控件族、列表、树、选择器、按钮等 |
 | [Cocos Creator UI 组件](https://docs.cocos.com/creator/manual/en/ui-system/components/editor/button.html) | 游戏引擎中的按钮、滑条、进度条、滚动视图等控件 |
 | [Dear ImGui](https://github.com/ocornut/imgui) | 游戏工具 UI 的按钮、滑条、树、表、菜单、弹窗等控件形态 |
@@ -342,7 +348,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 3. 每个组件都要是独立透明 PNG。
 4. 需要状态的组件要输出完整状态。
 5. 进度条、滑条要把 background/track/fill/handle 分开。
-6. 默认输出 overview.png 和 Godot 文件。
+6. 如果我提供项目路径，先自动识别目标引擎；没有项目路径或识别不出时再问我，然后输出 overview.png 和对应导入说明。
 7. 输出目录按类别整理，不要塞成一堆散图。
 
 验收：
@@ -385,7 +391,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 2. 不要直接生成完整界面，只生成独立组件。
 3. 组件透明背景。
 4. 面板和按钮要适合九宫格拉伸。
-5. 输出 overview.png 和 Godot 文件。
+5. 输出 overview.png 和目标引擎导入说明。
 
 完成后问我是否要把这张参考图和本次结果沉淀成项目风格库。
 ```
@@ -409,7 +415,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 5. 每个组件单独输出透明 PNG。
 6. 边框宁可多留一点，也不要切掉描边。
 7. 如果某个组件和背景不可分，要明确标注为近似结果，并建议用风格库重新生成。
-8. 默认输出 Godot 文件和 overview.png。
+8. 输出 overview.png 和目标引擎导入说明。
 ```
 
 拆分层级要按具体图自适应。比如复杂卡牌可以是：
@@ -466,12 +472,14 @@ python <skill-root>/scripts/package_ui_assets.py \
 | [rembg](https://github.com/danielgatis/rembg) | 简单独立素材的批量背景移除 |
 | [PyMatting](https://github.com/pymatting/pymatting) | 有 trimap 时处理抗锯齿、发光、软边 |
 
-## 7. 把已有 PNG 打包成 Godot UI 组件包
+## 7. 把已有 PNG 打包成目标引擎 UI 组件包
 
 如果你已经有透明 PNG，只想整理成游戏项目能用的结构：
 
 ```text
-使用 $game-ui-asset-pipeline，把我提供的 PNG 文件夹打包成 Godot 游戏 UI 组件包。
+使用 $game-ui-asset-pipeline，把我提供的 PNG 文件夹打包成游戏 UI 组件包。
+
+目标引擎：<自动识别项目 / Godot / Unity / Cocos / generic>
 
 要求：
 1. 自动识别 panel、button、progress_bar、icon、slot。
@@ -480,7 +488,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 4. 大包按 panels、buttons、bars、cards、slots、hud、icons、frames、images 分类。
 5. 根目录保留 overview.png。
 6. 每个层级保留自己的 overview.png。
-7. 默认不要输出 JSON、debug 文件夹、中间裁剪图、Unity/Cocos 文件。
+7. 如果提供了游戏项目路径，先根据项目代码自动识别目标引擎；识别失败或混合工程时再询问；不确定引擎时输出 generic PNG 包。
 ```
 
 ## 产出目录长什么样
@@ -502,7 +510,7 @@ python <skill-root>/scripts/package_ui_assets.py \
     │   ├── icons/
     │   ├── frames/
     │   └── images/
-    └── godot/
+    └── <engine>/
 ```
 
 默认不要把风格库、debug、JSON、中间裁剪图混进组件交付目录。风格库是长期记忆，组件包是这次要放进游戏里的结果。
@@ -520,7 +528,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 | 进度条 | background/track/fill 分开，能在引擎里组合 |
 | 面板/按钮 | 边角没有被切掉，适合九宫格拉伸 |
 | 文字 | 默认不烘焙文字，后续交给引擎文本节点 |
-| Godot | 有对应 Godot 起步文件或可导入结构 |
+| 目标引擎 | 有对应导入说明、起步文件或可导入结构 |
 
 发现问题时，不要自己猜怎么修。把 `overview.png` 或问题截图发给 AI：
 
@@ -544,10 +552,12 @@ python <skill-root>/scripts/package_ui_assets.py \
 ```text
 使用 $game-ui-asset-pipeline，先把我上传的参考图和说明沉淀成 <风格名> 风格库，再用这个风格库生成完整常用游戏 UI 组件包。
 
+目标引擎：<自动识别项目 / Godot / Unity / Cocos / generic>
+
 要求：
 1. 先提炼风格，不要直接生图。
 2. 组件按完整清单覆盖常见游戏 UI。
-3. 默认输出 Godot。
+3. 有项目路径时先自动识别目标引擎，再输出对应导入说明或起步文件。
 4. 输出后给我 overview.png，方便我反馈修改。
 ```
 
@@ -563,7 +573,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 要求：
 1. 只做这些，不要生成全套。
 2. 保持同画风。
-3. 输出透明 PNG、overview.png、Godot 文件。
+3. 有项目路径时先自动识别目标引擎；没有项目路径、识别失败或混合工程时再问，然后输出透明 PNG、overview.png 和对应导入说明。
 ```
 
 ### 让 AI 自己判断该生成哪些 UI
@@ -573,12 +583,13 @@ python <skill-root>/scripts/package_ui_assets.py \
 
 游戏类型：<比如：肉鸽地牢 / 模拟经营 / 卡牌战斗 / 生存探索>
 主要界面：<写几个界面>
+目标引擎：<自动识别项目 / Godot / Unity / Cocos / generic>
 
 要求：
 1. 先列出建议生成的组件清单。
 2. 清单要基于成熟 UI/control 原型，不要凭空想。
 3. 我确认后再生成。
-4. 默认 Godot，默认不输出 JSON/debug。
+4. 按目标引擎输出；不确定时先输出 generic PNG 包。
 ```
 
 ## 功能边界
@@ -587,7 +598,7 @@ python <skill-root>/scripts/package_ui_assets.py \
 - 截图拆分能复用可见像素，但不能恢复不存在的源图层。
 - 复杂边缘可以用分割、抠图、alpha matting 改善，但源图遮挡或粘连时仍要重新生成。
 - 文字默认不要烘焙进图片，除非你明确要文字美术字。
-- 默认目标引擎是 Godot。Unity、Cocos、JSON、debug 输出只有在用户明确要求时才做。
+- 生成引擎文件前先识别或确认目标引擎。用户不确定时，先交付 generic PNG 包、overview 和导入说明。
 
 ## License
 

@@ -7,7 +7,7 @@ Use this reference when the user asks to upload UI references, store a long-term
 - Generate UI component art from prompts or reference images with `image_gen`, ComfyUI, or the project's configured image backend.
 - Generate style-locked UI from stored user-provided references so a whole pack shares palette, stroke, material, and corner language.
 - Extract reusable visible pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them. Treat this as useful for prototypes, salvage, and exact visible elements; do not make it the preferred production route when clean source components can be regenerated.
-- Package existing PNGs into level folders containing `png/`, `godot/`, and `overview.png` by default. Unity/Cocos outputs are opt-in.
+- Package existing PNGs into level folders containing `png/`, `overview.png`, and target-engine files after detecting or confirming the engine. If the engine is unknown, output a generic PNG pack plus import notes.
 - Detect common chroma-key residue such as pink/green/blue edge dust during packaging.
 - Store user-provided style references in `assets/style-library/<style>/`, extract a dominant palette, save reference prompts, and create a style card for future prompt construction.
 
@@ -101,6 +101,8 @@ python <skill-root>/scripts/ingest_style_reference.py show --style <style-slug>
 
 Use this when the user wants production-ready components in the same style as materials previously stored in the skill. Prefer this over concept screenshot extraction for buttons, panels, bars, cards, slots, and repeatable HUD parts.
 
+Hard boundary: when the user asks to generate, make, produce, batch, create "常用 UI", or build a UI kit from a stored style, the stored screenshots are style evidence only. Do not crop them and present the crops as generated components. If image generation is blocked or unavailable, report the generation blocker or switch to another generation backend; never silently fall back to extraction.
+
 1. Run `list` or `show` to locate the style. Read the style card and inspect stored reference images.
 2. Build a compact style lock from positive references only:
    - exact palette hex colors from `palette.json`
@@ -108,7 +110,7 @@ Use this when the user wants production-ready components in the same style as ma
    - useful prompt phrasing from `reference-prompts.md`
    - component shape rules from the reference image
    - explicit negative prompt from the avoid-list plus text, mockup screens, perspective scenes, and off-palette colors
-3. If the user asks for a complete/common UI kit, read `ui-component-catalog.md` and choose the complete or project-specific checklist.
+3. If the user asks for a complete/common UI kit, read `ui-component-catalog.md` and choose `standard+` for "常用 UI" or `complete` for "完整/全套/覆盖所有需求". Cover every major catalog family unless the user narrows the scope.
 4. Prefer native alpha. If using a flat key background, run `suggest_key_color.py` on the style sources and use the recommended key in both prompt and cleanup.
 5. Generate related components in category batches when a single huge atlas would reduce quality. Keep the same style lock, key color, naming scheme, and output categories across every batch.
 6. If using a local diffusion workflow, prefer IP-Adapter for style/palette, ControlNet for silhouettes/layout, and LayerDiffuse/native alpha for transparent output.
@@ -118,7 +120,7 @@ Use this when the user wants production-ready components in the same style as ma
 
 ## Secondary Mode: Directly Cut Uploaded UI Components
 
-Use this when the user wants the UI elements already present in a screenshot/reference image.
+Use this only when the user explicitly wants the UI elements already present in a screenshot/reference image, such as "抠图", "裁出来", "extract", "cut", "salvage", "reuse the exact visible elements", or "从这张图拆". Do not choose this mode for generated UI kits, common UI packs, or style-library driven generation.
 
 1. Inspect the source image and list target components: panels, buttons, progress bars, icons, map nodes, slots, frames, tabs.
 2. If the user requested long-term reuse, ingest the source image into a style entry before extraction.
@@ -129,7 +131,7 @@ Use this when the user wants the UI elements already present in a screenshot/ref
    - atlas/grid: remove divider pixels before slicing and add transparent padding after trim
 5. For uncertain edges, keep the full visible border stroke first, then remove residue with matting and visual QA. Never solve a missing border by trimming tighter.
 6. Remove baked text unless the user asks for literal text art; provide blank frames/buttons for engine text nodes.
-7. Package the resulting PNGs with `package_ui_assets.py`, defaulting to level folders with PNG, Godot files, and overview images only.
+7. Package the resulting PNGs with `package_ui_assets.py`, defaulting to level folders with PNG, overview images, and only the detected or requested target-engine files.
 8. Treat packager warnings, visible residue, clipped edges, and accidental scene-background slivers as blockers before delivery. If the screenshot cannot provide a clean edge, regenerate the component from the style library.
 
 ## Prompt Pattern

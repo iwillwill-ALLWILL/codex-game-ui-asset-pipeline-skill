@@ -2,7 +2,7 @@
 """Package existing PNG game UI assets into clean level folders.
 
 This script does not generate creative art or remove backgrounds. It inspects,
-copies, previews, and creates Godot scaffolding for assets produced by image tools.
+copies, previews, and creates requested engine scaffolding for assets produced by image tools.
 """
 
 from __future__ import annotations
@@ -678,17 +678,77 @@ def copy_tree_contents(source: Path, target: Path) -> None:
             shutil.copy2(item, dest)
 
 
+def is_godot_project(project: Path) -> bool:
+    return (project / "project.godot").is_file()
+
+
+def is_unity_project(project: Path) -> bool:
+    return (
+        (project / "Assets").is_dir()
+        and (
+            (project / "ProjectSettings").is_dir()
+            or (project / "Packages" / "manifest.json").is_file()
+        )
+    )
+
+
+def is_cocos_project(project: Path) -> bool:
+    return (
+        (project / "project.json").is_file()
+        or (
+            (project / "assets").is_dir()
+            and (project / "settings").is_dir()
+            and (project / "package.json").is_file()
+        )
+    )
+
+
+def is_generic_web_project(project: Path) -> bool:
+    if (project / "index.html").is_file():
+        return True
+    if any((project / name).is_file() for name in ("vite.config.js", "vite.config.ts", "vite.config.mjs", "next.config.js", "next.config.mjs")):
+        return True
+    if (project / "src").is_dir() and ((project / "package.json").is_file() or (project / "public").is_dir()):
+        return True
+    package_json = project / "package.json"
+    if not package_json.is_file():
+        return False
+    try:
+        package = json.loads(package_json.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return True
+    deps = set()
+    for key in ("dependencies", "devDependencies", "peerDependencies"):
+        value = package.get(key)
+        if isinstance(value, dict):
+            deps.update(value)
+    return bool(deps & {"phaser", "pixi.js", "kaboom", "melonjs", "three", "vite"})
+
+
+def detect_project_engines(project: Path) -> list[str]:
+    detected: list[str] = []
+    if is_godot_project(project):
+        detected.append("godot")
+    if is_unity_project(project):
+        detected.append("unity")
+    if is_cocos_project(project):
+        detected.append("cocos")
+    if not detected and is_generic_web_project(project):
+        detected.append("generic")
+    return detected
+
+
 def install_to_project(output_dir: Path, project: Path, pack_name: str, engines: list[str]) -> list[str]:
     installed: list[str] = []
-    if "godot" in engines and (project / "project.godot").exists():
+    if "godot" in engines and is_godot_project(project):
         target = project / "assets" / "generated_ui" / pack_name
         copy_tree_contents(output_dir, target)
         installed.append(str(target))
-    if "unity" in engines and (project / "Assets").exists():
+    if "unity" in engines and is_unity_project(project):
         target = project / "Assets" / "GeneratedUI" / pack_name
         copy_tree_contents(output_dir, target)
         installed.append(str(target))
-    if "cocos" in engines and ((project / "assets").exists() or (project / "project.json").exists()):
+    if "cocos" in engines and is_cocos_project(project):
         target = project / "assets" / "generated-ui" / pack_name
         copy_tree_contents(output_dir, target)
         installed.append(str(target))
@@ -696,14 +756,30 @@ def install_to_project(output_dir: Path, project: Path, pack_name: str, engines:
 
 
 def parse_engines(value: str) -> list[str]:
-    if value.lower() == "all":
+    normalized = value.lower().strip()
+    if normalized == "all":
         return ["godot", "unity", "cocos", "generic"]
+    if normalized == "auto":
+        return ["auto"]
     allowed = {"godot", "unity", "cocos", "generic"}
     engines = [slugify(part) for part in value.split(",") if part.strip()]
     bad = [engine for engine in engines if engine not in allowed]
     if bad:
         raise SystemExit(f"Unsupported engine(s): {', '.join(bad)}")
-    return engines or ["generic"]
+    return engines or ["auto"]
+
+
+def resolve_engines(requested: list[str], project: Path | None) -> tuple[list[str], list[str]]:
+    detected = detect_project_engines(project) if project else []
+    if requested != ["auto"]:
+        return requested, detected
+    if len(detected) > 1:
+        raise SystemExit(
+            "Multiple project engines detected: "
+            f"{', '.join(detected)}. Re-run with --engines <godot|unity|cocos|generic> "
+            "for the project you want to install into, or use --engines all deliberately."
+        )
+    return detected or ["generic"], detected
 
 
 def discover_levels(input_dir: Path) -> list[tuple[str, Path, list[Path]]]:
@@ -799,14 +875,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input", required=True, type=Path, help="Folder containing generated PNG UI assets.")
     parser.add_argument("--output", required=True, type=Path, help="Output folder for packaged assets.")
     parser.add_argument("--pack-name", default="generated-ui", help="Slug used for output and engine folders.")
-    parser.add_argument("--engines", default="godot", help="Comma list: godot,unity,cocos,generic or all. Defaults to godot.")
+    parser.add_argument(
+        "--engines",
+        default="auto",
+        help="Comma list: auto,godot,unity,cocos,generic or all. Defaults to auto.",
+    )
     parser.add_argument("--asset-subdir", default="png", help="PNG folder name inside each level. Defaults to png.")
     parser.add_argument("--category-subdirs", action="store_true", help="Organize PNGs under category folders such as png/buttons and png/icons.")
     parser.add_argument("--write-manifest", action="store_true", help="Write ui-asset-manifest.json for debugging. Off by default.")
     parser.add_argument("--project", type=Path, help="Optional game project root to receive generated files.")
     parser.add_argument(
         "--godot-res-prefix",
-        help="Godot res:// prefix. Defaults to res://assets/generated_ui/<pack-name>.",
+        help="Godot res:// prefix. Defaults to res://assets/generated_ui/<pack-name>/<level>.",
     )
     parser.add_argument(
         "--unity-root",
@@ -816,8 +896,10 @@ def main(argv: list[str] | None = None) -> int:
 
     input_dir = args.input.resolve()
     output_dir = args.output.resolve()
+    project_root = args.project.resolve() if args.project else None
     pack_name = slugify(args.pack_name)
-    engines = parse_engines(args.engines)
+    engine_request = parse_engines(args.engines)
+    engines, detected_engines = resolve_engines(engine_request, project_root)
 
     if not input_dir.is_dir():
         raise SystemExit(f"Input directory does not exist: {input_dir}")
@@ -844,12 +926,16 @@ def main(argv: list[str] | None = None) -> int:
     write_root_overview(level_summaries, output_dir)
 
     installed = []
-    if args.project:
-        installed = install_to_project(output_dir, args.project.resolve(), pack_name, engines)
+    if project_root:
+        installed = install_to_project(output_dir, project_root, pack_name, engines)
 
     summary = {
         "pack_name": pack_name,
         "output": str(output_dir),
+        "project": str(project_root) if project_root else None,
+        "engine_request": engine_request,
+        "detected_project_engines": detected_engines,
+        "engines": engines,
         "levels": level_summaries,
         "assets": sum(level["assets"] for level in level_summaries),
         "components": sum(level["components"] for level in level_summaries),

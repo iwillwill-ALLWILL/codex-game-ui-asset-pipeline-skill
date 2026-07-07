@@ -1,6 +1,6 @@
 # UI Component Catalog
 
-Use this reference when the user asks for a full UI kit, common UI components, a complete game UI pack, or a well-organized output structure. Generate only the requested modules for narrow tasks; generate the full checklist when the user asks for "全套", "完整", "常用 UI", or "覆盖所有需求".
+Use this reference when the user asks for a full UI kit, common UI components, a complete game UI pack, or a well-organized output structure. Generate only the requested modules for narrow tasks; generate the full checklist when the user asks for "全套", "完整", or "覆盖所有需求". For "常用 UI" or "common UI", generate a broad `standard+` pack that covers every major catalog family; do not reduce it to a small smoke test unless the user explicitly asks for a tiny sample.
 
 ## Source-Grounded Catalog
 
@@ -19,7 +19,7 @@ Use these sources for taxonomy and naming only. Do not copy third-party art unle
 
 Every generated item should map to a known UI/control archetype or a common game UI asset archetype. If a requested item has no clear archetype, classify it as `project-specific` and describe why it is still useful before generating it.
 
-| Catalog family | Mature archetype | Godot default | Asset parts to generate |
+| Catalog family | Mature archetype | Engine mapping | Asset parts to generate |
 |---|---|---|---|
 | panels, windows, popups, frames | panel/container/card/dialog/surface | `NinePatchRect`, `Panel`, `PanelContainer` | stretchable background, border, corners, optional decor |
 | buttons and state buttons | button/icon button/toggle/checkbox/radio | `TextureButton`, `Button`, `CheckButton`, `CheckBox` | normal, hover, pressed, disabled, selected, optional icon plate |
@@ -42,7 +42,7 @@ For each catalog item or batch, expand the item into this contract before prompt
 - `use`: where it appears in a game screen.
 - `states`: required states such as normal, hover, pressed, disabled, selected, locked, ready, cooldown, full, empty, warning.
 - `parts`: required PNG parts such as bg/track/fill/handle/frame/corner/icon/decor.
-- `engine_mapping`: default Godot node family, usually `NinePatchRect`, `TextureButton`, `TextureProgressBar`, `TextureRect`, or a `Control` scene.
+- `engine_mapping`: target engine node or component family. For Godot this is usually `NinePatchRect`, `TextureButton`, `TextureProgressBar`, `TextureRect`, or a `Control` scene.
 - `style_lock`: palette, linework, material, corners, icon silhouette, glow/shadow rules from the selected style library.
 - `output_folder`: category folder such as `panels`, `buttons`, `bars`, `cards`, `slots`, `hud`, `icons`, `frames`, or `images`.
 
@@ -67,7 +67,7 @@ When packaging a full kit, keep level folders but organize PNGs by category:
     │   ├── icons/
     │   ├── frames/
     │   └── images/
-    └── godot/
+    └── <engine>/
 ```
 
 Use `package_ui_assets.py --category-subdirs` for this structure. Keep JSON/debug/intermediate files out of public delivery unless explicitly requested.
@@ -78,6 +78,17 @@ Use `package_ui_assets.py --category-subdirs` for this structure. Keep JSON/debu
 - `standard`: most game screens and HUD needs.
 - `complete`: broad reusable UI kit covering menus, HUD, inventory, battle, map, shop, settings, popups, icons, and decoration atoms.
 - `project-specific`: derive from the game's genre and user request, then add missing common modules from `standard` or `complete`.
+- `standard+`: default for "常用 UI" and "common UI" when no narrower scope is given. It must include category batches from all 12 catalog families, with buttons in multiple states and progress bars split into background/fill parts.
+
+Minimum deliverable for `standard+`:
+
+- Use generated sheets from an image backend, not screenshot crops.
+- Cover all 12 catalog families below.
+- Produce multiple category sheets, not one small atlas.
+- Include at least 60 named PNG components unless the user explicitly asks for fewer.
+- Include button families with `normal`, `hover`, `pressed`, and `disabled` states where possible.
+- Include progress/meter assets with separate `bg`/`track` and `fill` parts.
+- Include public `overview.png` images. Add target-engine scaffolding only after the target engine is detected or confirmed.
 
 ## Complete Common UI Checklist
 
