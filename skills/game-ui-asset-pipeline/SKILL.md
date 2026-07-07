@@ -24,7 +24,7 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - Engine: if a local game project root is available, inspect it before asking. Detect `godot` from `project.godot`, `unity` from `Assets` plus `ProjectSettings` or `Packages/manifest.json`, `cocos` from `project.json` or `assets/settings/package.json`, and `generic` from H5/web markers such as `index.html`, `package.json`, `src`, `public`, or Vite/Next config. Ask the user only when there is no project root, detection finds multiple engine roots, detection fails, or the user wants to override the detected target.
    - Input mode: prompt-only, reference image, existing PNGs, stored style library, direct screenshot extraction, or mixed.
    - Generation scope: full common UI kit, requested component subset, requested material/icon assets, existing PNG packaging, or concept screenshot extraction.
-   - Motion scope: static component, state set, or simple UI animation. For animation, ask whether it is a loop or one-shot, desired FPS, frame count, and target engine.
+   - Motion scope: static component, state set, or simple UI animation. For animation, first resolve the visual style source: stored style library, approved component pack, current reference image, or existing static component. If a style library exists, read it before generating frames. Then ask whether it is a loop or one-shot, desired FPS, frame count, and target engine.
    - Component granularity: build an adaptive split ladder from the actual image. Output every useful level by default, from large reusable groups down to atomic parts. Do not force a fixed five-level scheme; omit mechanical empty levels and name folders by their semantic purpose.
 
 2. If the user asks to store uploaded references for long-term reuse, ingest them into the skill style library.
@@ -59,7 +59,8 @@ Create game UI asset packs that can be dropped into a project. This skill is a p
    - For generated UI sheets/atlases, inspect the raw sheet layout before slicing. Do not assume a fixed grid when rows have different column counts or cells vary in size. Slice by true separator lines, cell bounds, or foreground component bounds from the original generated sheet. If fixed-grid slicing produced sticky neighbors or half-missing components, discard those derived crops and re-slice from the raw sheet.
    - Do not use "keep only the largest connected component" as a blanket cleanup for panels, frames, buttons, or HUD widgets. A single UI component may contain disconnected rivets, ornaments, frame sides, glow, or internal line art. Use connected-component analysis to find candidates for visual review, then remove only obvious background/separator scraps or regenerate/reslice from the original sheet.
    - For simple UI animations, generate or derive a stable frame sequence from the component art. Keep the canvas size, anchor, padding, and component bounds identical across frames.
-   - Prefer subtle UI motion: alpha glow, scale pulse, sparkle sweep, fill movement, highlight shimmer, state transition, or small decorative particles. Avoid changing the component design frame-to-frame.
+   - Style lock is mandatory for UI animation. Reuse palette hex values, line weight, material texture, corner language, glow/shadow style, icon silhouette, and ornament density from the selected style library or approved static component. Do not introduce a new VFX style just because the asset moves.
+   - Prefer subtle UI motion: alpha glow, scale pulse, sparkle sweep, fill movement, highlight shimmer, state transition, or small decorative particles. Keep the motion layers in the same visual language as the static UI. Avoid changing the component design frame-to-frame.
    - For labels, keep text out of baked frames unless the user explicitly requests text art. Animated buttons should usually animate the blank button, glow layer, fill, icon, or overlay while the engine renders text.
    - For nine-slice panels and buttons, avoid animating the stretchable border if a separate overlay, shine, glow, or fill layer can carry the motion. Static stretchable base plus animated overlay is easier to integrate than many full-panel frames.
    - Name animation frames predictably, such as `button_play_pulse_00.png`, `button_play_pulse_01.png`, or `icon_coin_glow_00.png`. Also export a static fallback PNG and a `preview.gif` or contact sheet.
@@ -152,7 +153,7 @@ If the current packager does not understand animation folders, package static PN
 
 9. QA before reporting done.
    - Open the root `overview.png` and each level's `overview.png`.
-   - Keep the public output focused: `level_xxx/png`, `level_xxx/godot`, and overview images.
+   - Keep the public output focused: `level_xxx/png`, `level_xxx/<engine>`, and overview images.
    - Treat `possible chroma-key residue` warnings as blockers for final delivery unless the color is intentional UI art.
    - Verify each button has at least a normal state, each progress bar has background/fill when possible, and stretchable components have reasonable slice margins.
    - Inspect cutout edges on dark and light backgrounds. If a frame loses visible pixels, add margin and rebuild the mask; if it includes scene-background pixels, use a tighter segmentation/matting pass.
@@ -161,6 +162,7 @@ If the current packager does not understand animation folders, package static PN
    - Inspect for over-cutting. If panels, frames, buttons, or HUD elements are missing sides, ornaments, fills, or frame pieces, do not "fix" by keeping the largest blob. Re-slice from the raw generated sheet using real cell boundaries, or regenerate that category.
    - Inspect scaled assets at 100 percent on the target background. If a large source was reduced and looks muddy, sparkly, or clumped, rebuild final-size PNGs with `scripts/resize_assets_high_quality.py` or regenerate closer to target size before packaging.
    - For UI animation, verify the `preview.gif` and contact sheet: every frame has the same size, stable anchor, clean alpha, consistent component design, readable loop/one-shot timing, and no accidental text or neighbor fragments.
+   - Compare UI animation frames against the style library, accepted static component, or reference pack before delivery. Regenerate if glow color, particles, shine shape, material, outline weight, or motion overlays look like they came from another UI kit.
    - For loops, check the first/last frame seam. For one-shot clips, check that the first frame can sit idle or has a matching static fallback.
    - If assets are blank, cropped, noisy, text-baked by accident, inconsistent across states, or only approximate because the concept screenshot is ambiguous, regenerate or clean them before integration.
 
@@ -168,7 +170,7 @@ If the current packager does not understand animation folders, package static PN
 
 - Read `references/toolchain.md` when choosing between built-in image generation, ComfyUI, chroma-key cleanup, background removal, atlas packers, or MCP/editor integration.
 - Read `references/component-contract.md` when naming assets, designing split levels, adjusting nine-slice margins, or mapping PNGs to a specific engine.
-- Read `references/style-library.md` when the user asks to upload references, store style materials, keep palette/style consistent across components, extract UI from a screenshot, or generate from a stored game style.
+- Read `references/style-library.md` when the user asks to upload references, store style materials, keep palette/style consistent across components, generate style-locked UI frame animations, extract UI from a screenshot, or generate from a stored game style.
 - Read `references/ui-component-catalog.md` when the user asks for a full UI kit, common UI components, a complete component set, or organized output categories.
 - Run `scripts/package_ui_assets.py --help` for deterministic packaging options.
 - Run `scripts/ingest_style_reference.py --help` for persistent style-library commands.

@@ -6,6 +6,7 @@ Use this reference when the user asks to upload UI references, store a long-term
 
 - Generate UI component art from prompts or reference images with `image_gen`, ComfyUI, or the project's configured image backend.
 - Generate style-locked UI from stored user-provided references so a whole pack shares palette, stroke, material, and corner language.
+- Generate simple UI frame animations from stored style references or approved static components so glow, shine, particles, fills, and transition frames match the same palette and material language.
 - Extract reusable visible pieces from uploaded UI screenshots or generated atlases, then clean alpha and package them. Treat this as useful for prototypes, salvage, and exact visible elements; do not make it the preferred production route when clean source components can be regenerated.
 - Package existing PNGs into level folders containing `png/`, `overview.png`, and target-engine files after detecting or confirming the engine. If the engine is unknown, output a generic PNG pack plus import notes.
 - Detect common chroma-key residue such as pink/green/blue edge dust during packaging.
@@ -49,17 +50,18 @@ Stored material can include:
 - `palette.json`: extracted palette candidates from all stored images.
 - `style-card.md`: compact style contract used for future prompting.
 - `reference-prompts.json` and `reference-prompts.md`: user-approved prompts and successful final prompts.
+- `motion-notes.md` or style-card notes: optional user-approved UI motion language such as glow softness, sweep shape, pulse strength, sparkle density, frame rate habits, and forbidden off-style effects.
 - `index.json`: searchable style list with tags, counts, palette preview, and file paths.
 
 Self-organization rules:
 
 1. Add new user-approved material, do not overwrite old material unless the user asks.
-2. Keep stable traits that appear across multiple references: palette roles, line weight, material treatment, corner language, icon silhouette, glow/shadow rules, and ornament density.
+2. Keep stable traits that appear across multiple references: palette roles, line weight, material treatment, corner language, icon silhouette, glow/shadow rules, ornament density, and UI motion language when accepted animated examples exist.
 3. Convert accepted outputs into stronger generation anchors when the user says the result is good.
 4. Convert rejected outputs into avoid-list notes: what drifted, which colors failed, which shapes were off-style, or which components were unusable.
 5. Keep prompt examples separate from visual notes. Prompts explain generation intent; style cards explain visual rules.
 6. Preserve a stable style precedence: explicit user requirement > style card > accepted outputs > anchor images > support references > prompt bank > broad docs. Rejected/noise entries are negative evidence only.
-7. For every future generation, read the style card, palette, prompt bank, avoid-list, and the most relevant anchor/accepted reference images before prompting the image backend.
+7. For every future generation, read the style card, palette, prompt bank, avoid-list, and the most relevant anchor/accepted reference images before prompting the image backend. For UI animation, also read accepted static components and any stored motion notes before choosing glow, shine, sweep, or particle behavior.
 
 ## Ingest Uploaded References
 
@@ -118,6 +120,20 @@ Hard boundary: when the user asks to generate, make, produce, batch, create "常
 8. Compare the generated components against the stored palette and style card before reporting done. Regenerate any component that drifts in color temperature, line weight, material, or corner language.
 9. If the user accepts the result, offer to ingest the final component sheet or final prompts back into the same style library.
 
+## Style-Locked UI Frame Animation
+
+Use this when the user asks for simple UI motion such as button pulse, icon glow, reward shine, progress sweep, loading spinner, notification ping, badge pop, or panel open/close.
+
+1. Resolve the style source before generating frames:
+   - If the user names a style library, run `list` or `show`, read the style card, inspect anchors/accepted outputs, and reuse the palette and material rules.
+   - If the user provides a static UI component, treat that component as the visual anchor and match its line weight, bevels, texture, glow color, and ornament density.
+   - If both exist, the style library wins for palette/material rules and the static component wins for exact shape, bounds, and anchor.
+2. Build the motion prompt from the same style lock used for static UI. Mention exact palette colors, glow/shadow rules, material, edge treatment, and forbidden off-style effects.
+3. Keep the base component design stable across frames. Animate overlays, highlights, fills, alpha, scale, sparkle, or glow; do not redraw the button/panel/icon into a different style.
+4. Export transparent same-size frames, a static fallback PNG, and `preview.gif` or contact sheet. Frame names must use the component and clip name, such as `button_play_pulse_00.png`.
+5. QA the animation against the style source. Regenerate if particles, sweep highlights, glow colors, line weight, or material shading look like another UI kit.
+6. If the user approves the animation, offer to store the accepted frames, preview, prompt, and motion notes back into the same style library as `accepted-output`.
+
 ## Secondary Mode: Directly Cut Uploaded UI Components
 
 Use this only when the user explicitly wants the UI elements already present in a screenshot/reference image, such as "抠图", "裁出来", "extract", "cut", "salvage", "reuse the exact visible elements", or "从这张图拆". Do not choose this mode for generated UI kits, common UI packs, or style-library driven generation.
@@ -145,4 +161,13 @@ Visual rules: <linework/material/corner/icon rules from style-card>.
 Components: <component list with states/parts>.
 Output: transparent PNG or flat <selected-key-color> removable background, orthographic UI art, no baked text, no watermark.
 Negative: modern flat app UI, photorealism, perspective scene, random colors outside palette, fuzzy edges, cropped glow, key-color edge residue.
+```
+
+For UI frame animation, extend the prompt with:
+
+```text
+Motion: <loop/one-shot>, <fps>, <frame count>, <pulse/glow/sweep/spinner/etc>.
+Style lock for motion: reuse the same palette, material, edge treatment, glow softness, shine shape, and ornament density from <style title or static component>.
+Frame rules: same canvas, same anchor, stable base component, animated overlay/fill/glow only, transparent background, static fallback frame.
+Negative: new VFX style, off-palette glow, unrelated particles, changing component design, baked text, cropped glow, unstable anchor.
 ```
